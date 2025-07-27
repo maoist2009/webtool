@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP CIDR 段合并工具</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* === IP Merge 特定样式 === */
+        #outputCIDR {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 50vh;
+            overflow-y: auto;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .format-options {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .format-option {
+            display: flex;
+            align-items: center;
+        }
+
+        .format-option input {
+            margin-right: 8px;
+        }
+
+        .stats {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            margin-top: 3px;
+        }
+
+        .examples {
+            background: #f0fff4;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        .examples h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #2d3748;
+            font-size: 1.1rem;
+        }
+
+        .example-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .example-item {
+            background: #f7fafc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .example-input, .example-output {
+            display: block;
+            margin: 5px 0;
+        }
+
+        .example-separator {
+            text-align: center;
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+
+        /* 加载状态指示 */
+        .processing {
+            color: var(--secondary-color);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>IP CIDR 段合并工具</h1>
+        <p class="subtitle">合并重叠或相邻的 IPv4/IPv6 CIDR 段 (高效算法)</p>
+    </header>
+    
+    <div class="container">
+        <div class="panel">
+            <h2 class="panel-title">输入 CIDR 段</h2>
+            <textarea id="inputCIDR" placeholder="输入 CIDR 段，每行一个&#10;例如：&#10;104.18.0.0/16&#10;104.19.0.0/17&#10;104.19.128.0/17&#10;1.1.1.1&#10;2001:db8::1&#10;2001:db8::/32"></textarea>
+            
+            <div class="controls">
+                <button id="processBtn">合并 CIDR</button>
+                <button id="clearInputBtn" class="btn-clear">清空输入</button>
+                <button id="sampleBtn">加载示例</button>
+            </div>
+            
+            <div class="format-options">
+                <label class="format-option">
+                    <input type="radio" name="format" value="standard" checked> 标准格式
+                </label>
+                <label class="format-option">
+                    <input type="radio" name="format" value="compact"> 紧凑格式
+                </label>
+                <label class="format-option">
+                    <input type="radio" name="format" value="list"> 列表格式
+                </label>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2 class="panel-title">输出结果</h2>
+            
+            <div class="controls">
+                <button id="copyBtn">复制结果</button>
+                <button id="downloadBtn" class="btn-secondary">下载结果</button>
+                <button id="clearOutputBtn" class="btn-clear">清空输出</button>
+            </div>
+
+            <div id="statsContainer" class="stats" style="display: none;">
+                <h3>统计信息</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="originalCount">0</div>
+                        <div class="stat-label">原始段数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="mergedCount">0</div>
+                        <div class="stat-label">合并后段数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="ipv4Original">0</div>
+                        <div class="stat-label">IPv4 原始</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="ipv4Merged">0</div>
+                        <div class="stat-label">IPv4 合并</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="ipv6Original">0</div>
+                        <div class="stat-label">IPv6 原始</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="ipv6Merged">0</div>
+                        <div class="stat-label">IPv6 合并</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="reductionPercent">0%</div>
+                        <div class="stat-label">简化率</div>
+                    </div>
+                </div>
+            </div>
+            
+            <textarea id="outputCIDR" placeholder="合并后的 CIDR 段将显示在这里" readonly></textarea>
+        </div>
+    </div>
+    
+    <div class="examples">
+        <h3>使用示例</h3>
+        <div class="example-list">
+            <div class="example-item">
+                <strong>IPv4 合并</strong>
+                <span class="example-input">104.18.0.0/16</span>
+                <span class="example-input">104.19.0.0/17</span>
+                <span class="example-input">104.19.128.0/17</span>
+                <div class="example-separator">↓</div>
+                <span class="example-output">104.18.0.0/15</span>
+            </div>
+            <div class="example-item">
+                <strong>IPv6 合并</strong>
+                <span class="example-input">2001:db8::/32</span>
+                <span class="example-input">2001:db8:1::/48</span>
+                <span class="example-input">2001:db8:2::/48</span>
+                <div class="example-separator">↓</div>
+                <span class="example-output">2001:db8::/32</span>
+            </div>
+             <div class="example-item">
+                <strong>无前缀合并</strong>
+                <span class="example-input">1.0.0.0</span>
+                <span class="example-input">1.1.1.1</span>
+                <span class="example-input">1.1.1.2/32</span>
+                <div class="example-separator">↓</div>
+                <span class="example-output">1.0.0.0/32, 1.1.1.1/32, 1.1.1.2/32</span>
+                <span class="example-output">(或合并为更大范围，取决于算法)</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+    
+    <footer>
+        <p>IP CIDR 段合并工具 | 支持 IPv4 和 IPv6 | 基于高效整数范围合并算法</p>
+    </footer>
+
+    <script>
+        // 显示通知
+        function showNotification(message, isSuccess = true) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${isSuccess ? 'success' : 'error'}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // --- IPv4 处理 ---
+        function ipv4ToBigInt(ip) {
+            const parts = ip.split('.').map(Number);
+            if (parts.length !== 4) throw new Error(`无效的 IPv4 地址: ${ip}`);
+            return (BigInt(parts[0]) << 24n) +
+                   (BigInt(parts[1]) << 16n) +
+                   (BigInt(parts[2]) << 8n) +
+                   BigInt(parts[3]);
+        }
+
+        function bigIntToIPv4(bigInt) {
+            return `${(bigInt >> 24n) & 0xFFn}.${(bigInt >> 16n) & 0xFFn}.${(bigInt >> 8n) & 0xFFn}.${bigInt & 0xFFn}`;
+        }
+
+        function prefixLengthToMaskIPv4(prefixLen) {
+            if (prefixLen === 0) return 0n;
+            return (~0n) << (32n - BigInt(prefixLen));
+        }
+
+        // --- IPv6 处理 ---
+        // 简化的 IPv6 规范化和转换 (实际应用中可能需要更健壮的库)
+        function ipv6ToBigInt(ip) {
+            // 处理 :: 缩写
+            let fullAddr = ip;
+            if (ip.includes('::')) {
+                const parts = ip.split('::');
+                const leftParts = parts[0] ? parts[0].split(':') : [];
+                const rightParts = parts[1] ? parts[1].split(':') : [];
+                const missingParts = 8 - leftParts.length - rightParts.length;
+                const zeros = Array(missingParts).fill('0');
+                const allParts = [...leftParts, ...zeros, ...rightParts];
+                fullAddr = allParts.join(':');
+            }
+
+            const parts = fullAddr.split(':');
+            if (parts.length !== 8) throw new Error(`无效的 IPv6 地址: ${ip}`);
+
+            let result = 0n;
+            for (let i = 0; i < 8; i++) {
+                const part = parts[i];
+                // 处理可能的省略前导零 (e.g., 'a' instead of '000a')
+                const value = BigInt(`0x${part.padStart(4, '0')}`);
+                result = (result << 16n) + value;
+            }
+            return result;
+        }
+
+        function bigIntToIPv6(bigInt) {
+            const parts = [];
+            for (let i = 0; i < 8; i++) {
+                const part = (bigInt >> BigInt(112 - i * 16)) & 0xFFFFn;
+                parts.push(part.toString(16));
+            }
+            return parts.join(':');
+        }
+
+        function prefixLengthToMaskIPv6(prefixLen) {
+            if (prefixLen === 0) return 0n;
+            // BigInt(1) << 128n 会溢出，所以用 (~0n) << (128n - prefixLen)
+            // 但 (~0n) 是 -1，我们需要一个 128 位全 1 的数
+            const fullMask = (1n << 128n) - 1n;
+            return fullMask << (128n - BigInt(prefixLen));
+        }
+
+        // --- CIDR 类 ---
+        class IPCIDR {
+            constructor(cidrString) {
+                // --- 关键修改：支持无前缀的纯 IP 地址 ---
+                let addressPart, prefixPart;
+                const trimmedInput = cidrString.trim();
+
+                if (trimmedInput.includes('/')) {
+                    // 标准 CIDR 格式 a.b.c.d/p 或 x:x::x/p
+                    const parts = trimmedInput.split('/');
+                    addressPart = parts[0];
+                    prefixPart = parts[1];
+                } else {
+                    // 无前缀格式，视为单个 IP
+                    addressPart = trimmedInput;
+                    // 根据地址类型自动确定默认前缀长度
+                    prefixPart = addressPart.includes(':') ? '128' : '32';
+                }
+                // --- 修改结束 ---
+
+                this.address = addressPart;
+                this.prefixLength = parseInt(prefixPart, 10);
+                
+                if (isNaN(this.prefixLength) || this.prefixLength < 0) {
+                    throw new Error(`无效的前缀长度: ${cidrString}`);
+                }
+
+                if (this.address.includes(':')) {
+                    this.version = 6;
+                    if (this.prefixLength > 128) {
+                        throw new Error(`IPv6 前缀长度超出范围 (0-128): ${cidrString}`);
+                    }
+                    this.start = ipv6ToBigInt(this.address);
+                    const mask = prefixLengthToMaskIPv6(this.prefixLength);
+                    this.end = this.start | (~mask & ((1n << 128n) - 1n));
+                    this.network = this.start & mask; // 网络地址
+                } else {
+                    this.version = 4;
+                    if (this.prefixLength > 32) {
+                        throw new Error(`IPv4 前缀长度超出范围 (0-32): ${cidrString}`);
+                    }
+                    this.start = ipv4ToBigInt(this.address);
+                    const mask = prefixLengthToMaskIPv4(this.prefixLength);
+                    this.end = this.start | (~mask & 0xFFFFFFFFn);
+                    this.network = this.start & mask; // 网络地址
+                }
+            }
+
+            toString() {
+                if (this.version === 4) {
+                    return `${bigIntToIPv4(this.network)}/${this.prefixLength}`;
+                } else {
+                    return `${bigIntToIPv6(this.network)}/${this.prefixLength}`;
+                }
+            }
+
+            // 检查两个范围是否相邻且可以合并成一个更大的范围
+            canMergeWith(other) {
+                if (this.version !== other.version) return false;
+                
+                // 必须是相同前缀长度且相邻
+                if (this.prefixLength !== other.prefixLength) return false;
+                
+                // 检查是否相邻
+                if (this.end + 1n === other.start) {
+                    // this 在前，other 在后
+                    // 合并后的前缀长度应该是当前长度 - 1
+                    const mergedPrefixLen = this.prefixLength - 1;
+                    if (mergedPrefixLen < 0) return false;
+                    
+                    // 检查合并后的网络地址是否正确
+                    let mask;
+                    if (this.version === 4) {
+                        mask = prefixLengthToMaskIPv4(mergedPrefixLen);
+                    } else {
+                        mask = prefixLengthToMaskIPv6(mergedPrefixLen);
+                    }
+                    const mergedNetwork = this.start & mask;
+                    return mergedNetwork === (other.start & mask);
+                }
+                
+                if (other.end + 1n === this.start) {
+                    // other 在前，this 在后
+                    const mergedPrefixLen = this.prefixLength - 1;
+                    if (mergedPrefixLen < 0) return false;
+                    
+                    let mask;
+                    if (this.version === 4) {
+                        mask = prefixLengthToMaskIPv4(mergedPrefixLen);
+                    } else {
+                        mask = prefixLengthToMaskIPv6(mergedPrefixLen);
+                    }
+                    const mergedNetwork = other.start & mask;
+                    return mergedNetwork === (this.start & mask);
+                }
+                
+                return false;
+            }
+
+            // 与另一个相邻的 CIDR 合并 (假设它们可以合并)
+            mergeWith(other) {
+                if (!this.canMergeWith(other)) {
+                    throw new Error("CIDR 段无法合并");
+                }
+                const mergedPrefixLen = this.prefixLength - 1;
+                // 创建新的合并后的 CIDR
+                if (this.version === 4) {
+                    const mask = prefixLengthToMaskIPv4(mergedPrefixLen);
+                    const mergedNetwork = this.start & mask;
+                    return new IPCIDR(`${bigIntToIPv4(mergedNetwork)}/${mergedPrefixLen}`);
+                } else {
+                    const mask = prefixLengthToMaskIPv6(mergedPrefixLen);
+                    const mergedNetwork = this.start & mask;
+                    return new IPCIDR(`${bigIntToIPv6(mergedNetwork)}/${mergedPrefixLen}`);
+                }
+            }
+        }
+
+        // --- 核心合并算法 ---
+        function mergeCIDRs(cidrList) {
+            if (cidrList.length === 0) return [];
+
+            const ranges = [];
+            try {
+                for (const cidrStr of cidrList) {
+                    ranges.push(new IPCIDR(cidrStr));
+                }
+            } catch (error) {
+                throw new Error(`解析 CIDR 失败: ${error.message}`);
+            }
+
+            // 1. 按版本、起始地址排序
+            ranges.sort((a, b) => {
+                if (a.version !== b.version) return a.version - b.version;
+                if (a.start < b.start) return -1;
+                if (a.start > b.start) return 1;
+                // 起始地址相同时，按前缀长度降序排列（更具体的在前）
+                return b.prefixLength - a.prefixLength;
+            });
+
+            // 2. 合并重叠和相邻的范围
+            const merged = [];
+            for (const current of ranges) {
+                if (merged.length === 0) {
+                    merged.push(current);
+                    continue;
+                }
+
+                const lastMerged = merged[merged.length - 1];
+
+                // 检查是否被包含
+                if (lastMerged.start <= current.start && lastMerged.end >= current.end) {
+                    // current 被 lastMerged 包含，跳过
+                    continue;
+                }
+
+                // 检查是否重叠或相邻
+                if (current.start <= lastMerged.end + 1n) {
+                    // 重叠或相邻，需要合并
+                    // 简单策略：如果前缀长度相同且相邻，则合并
+                    if (lastMerged.canMergeWith(current)) {
+                        try {
+                            merged[merged.length - 1] = lastMerged.mergeWith(current);
+                        } catch (e) {
+                            // 如果合并失败（例如前缀长度不同），则扩展范围
+                            lastMerged.end = current.end > lastMerged.end ? current.end : lastMerged.end;
+                        }
+                    } else {
+                        // 前缀长度不同或不满足合并条件，扩展范围
+                        lastMerged.end = current.end > lastMerged.end ? current.end : lastMerged.end;
+                    }
+                } else {
+                    // 不重叠也不相邻，添加新的范围
+                    merged.push(current);
+                }
+            }
+
+            // 3. 将合并后的范围转换回 CIDR 字符串
+            // 注意：上面的合并可能产生不规范的范围（起始地址不是网络地址）
+            // 我们需要将它们规范化为有效的 CIDR
+            const finalMerged = [];
+            for (const range of merged) {
+                // 计算范围对应的前缀长度（这是一个简化近似）
+                // 实际应用中可能需要更复杂的逻辑来找到最合适的 CIDR 表示
+                // 这里我们尝试找到能覆盖 [start, end] 的最小前缀
+                let prefixLen = range.version === 4 ? 32 : 128;
+                let mask;
+                if (range.version === 4) {
+                    mask = prefixLengthToMaskIPv4(prefixLen);
+                } else {
+                    mask = prefixLengthToMaskIPv6(prefixLen);
+                }
+                
+                // 找到最小的前缀长度，使得 (start & mask) 是网络地址且能覆盖整个范围
+                while (prefixLen > 0) {
+                     const network = range.start & mask;
+                     const broadcast = network | (~mask & (range.version === 4 ? 0xFFFFFFFFn : (1n << 128n) - 1n));
+                     if (network <= range.start && broadcast >= range.end) {
+                         // 找到了合适的前缀
+                         range.network = network;
+                         range.prefixLength = prefixLen;
+                         break;
+                     }
+                     prefixLen--;
+                     if (range.version === 4) {
+                         mask = prefixLengthToMaskIPv4(prefixLen);
+                     } else {
+                         mask = prefixLengthToMaskIPv6(prefixLen);
+                     }
+                }
+                
+                if (prefixLen === 0) {
+                    range.network = range.version === 4 ? 0n : 0n;
+                    range.prefixLength = 0;
+                }
+                
+                finalMerged.push(new IPCIDR(range.toString()));
+            }
+
+            return finalMerged;
+        }
+
+
+        // 获取统计信息
+        function getStatistics(originalList, mergedList) {
+            const originalCount = originalList.length;
+            const mergedCount = mergedList.length;
+
+            let ipv4Original = 0, ipv6Original = 0;
+            let ipv4Merged = 0, ipv6Merged = 0;
+
+            originalList.forEach(cidr => {
+                if (cidr.includes(':')) ipv6Original++;
+                else ipv4Original++;
+            });
+
+            mergedList.forEach(cidr => {
+                if (cidr.includes(':')) ipv6Merged++;
+                else ipv4Merged++;
+            });
+
+            return {
+                originalCount,
+                mergedCount,
+                ipv4Original,
+                ipv4Merged,
+                ipv6Original,
+                ipv6Merged,
+                reductionPercent: originalCount > 0 ? 
+                    Math.round((1 - mergedCount / originalCount) * 100 * 100) / 100 : 0
+            };
+        }
+
+        // 格式化输出结果
+        function formatOutput(cidrList, outputFormat) {
+            if (cidrList.length === 0) return "";
+
+            switch (outputFormat) {
+                case 'compact':
+                    return cidrList.map(cidr => cidr.toString()).join(', ');
+                case 'list':
+                    return cidrList.map(cidr => cidr.toString()).join('\n');
+                default: // standard
+                    return cidrList.map(cidr => cidr.toString()).join('\n');
+            }
+        }
+
+        // DOM元素
+        const inputCIDR = document.getElementById('inputCIDR');
+        const outputCIDR = document.getElementById('outputCIDR');
+        const processBtn = document.getElementById('processBtn');
+        const clearInputBtn = document.getElementById('clearInputBtn');
+        const clearOutputBtn = document.getElementById('clearOutputBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const sampleBtn = document.getElementById('sampleBtn');
+        const statsContainer = document.getElementById('statsContainer');
+        const formatOptions = document.getElementsByName('format');
+
+        // 事件监听器
+        processBtn.addEventListener('click', () => {
+            const inputText = inputCIDR.value.trim();
+            if (!inputText) {
+                showNotification('请输入 CIDR 段', false);
+                return;
+            }
+
+            // 显示处理状态
+            outputCIDR.value = '处理中...';
+            outputCIDR.classList.add('processing');
+            statsContainer.style.display = 'none';
+
+            // 使用 setTimeout 让 UI 有机会更新显示 "处理中..."
+            setTimeout(() => {
+                try {
+                    const lines = inputText.split(/[\r\n]+/).filter(line => line.trim() !== '');
+                    
+                    if (lines.length === 0) {
+                        throw new Error('没有有效的 CIDR 输入');
+                    }
+
+                    const mergedObjs = mergeCIDRs(lines);
+                    const mergedStrings = mergedObjs.map(obj => obj.toString());
+
+                    // 获取选中的输出格式
+                    const selectedFormat = Array.from(formatOptions).find(opt => opt.checked).value;
+                    const outputText = formatOutput(mergedObjs, selectedFormat);
+                    outputCIDR.value = outputText;
+                    outputCIDR.classList.remove('processing');
+
+                    // 显示统计信息
+                    const stats = getStatistics(lines, mergedStrings);
+                    document.getElementById('originalCount').textContent = stats.originalCount;
+                    document.getElementById('mergedCount').textContent = stats.mergedCount;
+                    document.getElementById('ipv4Original').textContent = stats.ipv4Original;
+                    document.getElementById('ipv4Merged').textContent = stats.ipv4Merged;
+                    document.getElementById('ipv6Original').textContent = stats.ipv6Original;
+                    document.getElementById('ipv6Merged').textContent = stats.ipv6Merged;
+                    document.getElementById('reductionPercent').textContent = `${stats.reductionPercent}%`;
+                    statsContainer.style.display = 'block';
+
+                    showNotification('CIDR 段合并完成！');
+                } catch (error) {
+                    outputCIDR.value = `处理错误: ${error.message}`;
+                    outputCIDR.classList.remove('processing');
+                    showNotification(error.message, false);
+                }
+            }, 50); // 50ms 延迟通常足够
+        });
+
+        clearInputBtn.addEventListener('click', () => {
+            inputCIDR.value = '';
+            inputCIDR.focus();
+            showNotification('输入已清空');
+        });
+
+        clearOutputBtn.addEventListener('click', () => {
+            outputCIDR.value = '';
+            statsContainer.style.display = 'none';
+            showNotification('输出已清空');
+        });
+
+        copyBtn.addEventListener('click', () => {
+            if (!outputCIDR.value || outputCIDR.classList.contains('processing')) {
+                showNotification('没有结果可复制', false);
+                return;
+            }
+            outputCIDR.select();
+            document.execCommand('copy');
+            showNotification('结果已复制到剪贴板');
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!outputCIDR.value || outputCIDR.classList.contains('processing')) {
+                showNotification('没有结果可下载', false);
+                return;
+            }
+            const blob = new Blob([outputCIDR.value], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'merged_cidr.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification('结果已下载');
+        });
+
+        sampleBtn.addEventListener('click', () => {
+            // 提供一个测试示例，包含无前缀的 IP
+            const sample = `104.18.0.0/16
+104.19.0.0/17
+104.19.128.0/17
+1.0.0.0
+1.1.1.1
+172.16.0.0/12
+172.17.0.0/16
+172.18.0.0/15
+192.168.0.0/16
+192.168.1.0/24
+192.168.2.0/24
+10.0.0.0/8
+10.1.0.0/16
+10.2.0.0/16
+2001:db8::1
+2001:db8::/32
+2001:db8:1::/48
+2001:db8:2::/48`;
+            inputCIDR.value = sample;
+            showNotification('包含无前缀IP的示例已加载');
+        });
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            inputCIDR.focus();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>页面未找到 - 网络工具箱</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* === 404 页面特定样式 === */
+        .error-container {
+            text-align: center;
+            padding: 50px 20px;
+            max-width: 600px;
+            margin: 50px auto;
+            background: var(--panel-background);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .error-code {
+            font-size: 5rem;
+            font-weight: 800;
+            color: var(--error-color);
+            margin: 0;
+            line-height: 1;
+        }
+
+        .error-title {
+            font-size: 2rem;
+            margin: 20px 0;
+            color: var(--heading-color);
+        }
+
+        .error-message {
+            font-size: 1.1rem;
+            color: var(--secondary-color);
+            margin-bottom: 30px;
+        }
+
+        .error-actions {
+            margin-top: 30px;
+        }
+
+        .error-actions a {
+            display: inline-block;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+
+        .error-actions .btn-home {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .error-actions .btn-home:hover {
+            background: linear-gradient(135deg, var(--primary-hover) 0%, #6a4190 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-code">404</div>
+        <h1 class="error-title">哎呀，页面找不到了！</h1>
+        <p class="error-message">您访问的页面似乎不存在或已被移除。请检查 URL 是否正确，或返回主页。</p>
+        
+        <div class="error-actions">
+            <a href="index.html" class="btn btn-home">返回主页</a>
+            <a href="DoH.html" class="btn btn-secondary">试试 DOH 查询</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>网络工具箱 | 404 页面</p>
+    </footer>
+</body>
+</html>

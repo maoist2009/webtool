@@ -1,0 +1,16 @@
+{
+  "name": "网络工具箱",
+  "short_name": "NetTools",
+  "description": "一套高效、安全、易用的在线网络工具集，支持离线使用。",
+  "start_url": "./index.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#667eea",
+  "icons": [
+    {
+      "src": "icon.png",
+      "type": "image/svg"
+    }
+  ]
+}

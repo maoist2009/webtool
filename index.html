@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络工具箱</title>
+        <meta
+            name="description"
+            content="一系列网络工具箱"
+        />
+        <meta name="keywords" content="tool,web,censor,china,gfw" />
+
+        <!-- web app -->
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
+        />
+
+        <!-- theme color-->
+        <meta
+            name="theme-color"
+            content="#e87c93"
+            media="(prefers-color-scheme: light)"
+        />
+        <meta
+            name="theme-color"
+            content="#e87c93"
+            media="(prefers-color-scheme: dark)"
+        />
+
+        <!-- fav icon -->
+        <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
+
+        <!-- apple-touch-icon -->
+        <link rel="/favicon.svg" type="image/svg+xml" />
+
+        <title>bilibili</title>
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* === 主页特定样式 === */
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
+            color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 40px;
+        }
+
+        .hero h1 {
+            font-size: 2.8rem;
+            margin-bottom: 15px;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            max-width: 700px;
+            margin: 0 auto 25px;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .tool-card {
+            background: var(--panel-background);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
+            text-decoration: none;
+            color: var(--text-color);
+            display: block;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-color: var(--primary-color);
+        }
+
+        .tool-card h3 {
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .tool-card h3 i {
+            margin-right: 10px;
+            font-size: 1.5rem;
+        }
+
+        .tool-card p {
+            color: var(--secondary-color);
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .tool-card .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .tool-card .btn:hover {
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, var(--primary-hover) 0%, #6a4190 100%);
+        }
+
+        .features {
+            margin-top: 50px;
+            text-align: center;
+        }
+
+        .features h2 {
+            color: var(--heading-color);
+            margin-bottom: 30px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .feature-item {
+            background: var(--panel-background);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .feature-item h4 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <header class="hero">
+        <h1>网络工具箱</h1>
+        <p>一套高效、安全、易用的在线网络工具集</p>
+    </header>
+
+    <div class="container">
+        <h2 style="text-align: center; color: var(--heading-color); margin-bottom: 30px;">核心工具</h2>
+        
+        <div class="tools-grid">
+            <a href="DoH.html" class="tool-card">
+                <h3><i>🔍</i> DNS over HTTPS 查询</h3>
+                <p>通过加密的 HTTPS 协议安全地查询 DNS 记录，保护您的隐私。</p>
+                <span class="btn">立即使用</span>
+            </a>
+            
+            <a href="CIDRmerge.html" class="tool-card">
+                <h3><i>🌐</i> IP CIDR 合并</h3>
+                <p>高效合并重叠或相邻的 IPv4/IPv6 CIDR 地址段。</p>
+                <span class="btn">立即使用</span>
+            </a>
+        </div>
+
+        <div class="features">
+            <h2>为什么选择我们的工具箱？</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <h4>🔒 安全可靠</h4>
+                    <p>所有计算均在浏览器本地完成，数据无需上传服务器。</p>
+                </div>
+                <div class="feature-item">
+                    <h4>⚡ 快速高效</h4>
+                    <p>采用优化算法，即使是大量数据也能秒速处理。</p>
+                </div>
+                <div class="feature-item">
+                    <h4>🎨 简洁美观</h4>
+                    <p>现代化 UI 设计，提供愉悦的用户体验。</p>
+                </div>
+                <div class="feature-item">
+                    <h4>📱 响应式</h4>
+                    <p>完美适配桌面、平板和手机等各种设备。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>网络工具箱 | 所有工具均为本地处理，保障您的数据安全</p>
+    </footer>
+</body>
+</html>

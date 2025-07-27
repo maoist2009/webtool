@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS over HTTPS 查询工具</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* === DOH 特定样式覆盖 === */
+        /* 优化主结果显示区域 */
+        #result {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            /* 固定高度并允许滚动，防止内容过多时挤压布局 */
+            max-height: 60vh;
+            overflow-y: auto;
+            /* 确保内部滚动不影响页面滚动 */
+            overscroll-behavior: contain;
+            font-size: 14px; /* 稍微调整字体大小 */
+        }
+
+        /* 调整按钮位置 - 回到控件区域 */
+        #clearBtn {
+            position: static;
+            top: auto;
+            right: auto;
+            z-index: auto;
+            padding: 12px 25px;
+            font-size: 16px;
+            margin-left: 15px; /* 与前一个按钮的间距 */
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <h1>DNS over HTTPS 查询工具</h1>
+        <p class="subtitle">安全、加密的DNS查询</p>
+    </header>
+    
+    <div class="container">
+        <div class="panel">
+            <h2 class="panel-title">查询配置</h2>
+            <form id="dnsForm">
+                <label for="domain">域名:</label>
+                <input type="text" id="domain" placeholder="输入域名 (例如: example.com)" required>
+                
+                <label for="type">记录类型:</label>
+                <select id="type">
+                    <option value="A">A (IPv4 地址)</option>
+                    <option value="AAAA">AAAA (IPv6 地址)</option>
+                    <option value="HTTPS">HTTPS (HTTPS 记录)</option>
+                    <option value="MX">MX (邮件交换)</option>
+                    <option value="TXT">TXT (文本记录)</option>
+                    <option value="CNAME">CNAME (规范名称)</option>
+                    <option value="NS">NS (名称服务器)</option>
+                </select>
+                
+                <label for="dohServer">DoH 服务器 (可选):</label>
+                <input type="text" id="dohServer" placeholder="例如: https://cloudflare-dns.com/dns-query">
+                
+                <div class="controls">
+                    <button type="submit">执行查询</button>
+                    <button type="button" id="sampleBtn" class="btn-secondary">示例</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="panel">
+            <h2 class="panel-title">查询结果</h2>
+			<div class="controls">
+                <button id="copyBtn">复制结果</button>
+                <button id="downloadBtn" class="btn-secondary">下载结果</button>
+                <!-- 将清空按钮放回这里 -->
+                <button type="button" id="clearBtn" class="btn-clear">清空</button>
+            </div>
+            <pre id="result">查询结果将显示在这里...</pre>
+        </div>
+    </div>
+    
+    <footer>
+        <p>DNS over HTTPS 查询工具 | 使用现代加密技术保护您的DNS查询</p>
+    </footer>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // 显示通知
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // 将十六进制字符串转换为 Uint8Array
+        function hexToUint8Array(hex) {
+            return new Uint8Array(
+                hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+            );
+        }
+
+        // 从 Uint8Array 读取 16 位无符号整数 (大端序)
+        function readUint16(data, offset) {
+            return (data[offset] << 8) | data[offset + 1];
+        }
+
+        // Base64 编码
+        function base64Encode(data) {
+            const binaryString = String.fromCharCode(...data);
+            return btoa(unescape(encodeURIComponent(binaryString)));
+        }
+
+        // 解析 ALPN 值
+        function parseAlpn(value, decoder) {
+            const alpn = [];
+            let idx = 0;
+            while (idx < value.length) {
+                const length = value[idx];
+                if (idx + 1 + length > value.length) {
+                    console.error("Invalid ALPN length:", length);
+                    break;
+                }
+                alpn.push(decoder.decode(value.slice(idx + 1, idx + 1 + length)));
+                idx += 1 + length;
+            }
+            return alpn;
+        }
+
+        // 解析 IPv4 Hint
+        function parseIpv4Hint(value) {
+            const ipv4hint = [];
+            for (let i = 0; i < value.length; i += 4) {
+                if (i + 4 > value.length) {
+                    console.error("Invalid IPv4 hint length");
+                    break;
+                }
+                const ip = `${value[i]}.${value[i+1]}.${value[i+2]}.${value[i+3]}`;
+                ipv4hint.push(ip);
+            }
+            return ipv4hint;
+        }
+
+        // 解析 IPv6 Hint
+        function parseIpv6Hint(value) {
+            const ipv6hint = [];
+            for (let i = 0; i < value.length; i += 16) {
+                if (i + 16 > value.length) {
+                    console.error("Invalid IPv6 hint length");
+                    break;
+                }
+                const parts = [];
+                for (let j = 0; j < 16; j += 2) {
+                    const segment = (value[i + j] << 8) | value[i + j + 1];
+                    parts.push(segment.toString(16));
+                }
+                ipv6hint.push(parts.join(":"));
+            }
+            return ipv6hint;
+        }
+
+        // 解析 HTTPS 记录的参数列表
+        function parseParams(data, offset, decoder) {
+            const params = {};
+            while (offset + 4 <= data.length) {
+                const key = readUint16(data, offset);
+                const valueLength = readUint16(data, offset + 2);
+                offset += 4;
+
+                if (offset + valueLength > data.length) {
+                    console.error("Invalid value length:", valueLength);
+                    break;
+                }
+
+                const value = data.slice(offset, offset + valueLength);
+                offset += valueLength;
+
+                switch (key) {
+                    case 1: // ALPN
+                        params.alpn = parseAlpn(value, decoder);
+                        break;
+                    case 4: // IPv4 Hint
+                        params.ipv4hint = parseIpv4Hint(value);
+                        break;
+                    case 5: // ECH
+                        params.ech = base64Encode(value);
+                        break;
+                    case 6: // IPv6 Hint
+                        params.ipv6hint = parseIpv6Hint(value);
+                        break;
+                    default:
+                        params[`key_${key}`] = {
+                            length: valueLength,
+                            raw_hex: Array.from(value).map(b => b.toString(16).padStart(2, "0")).join(""),
+                            raw_base64: base64Encode(value)
+                        };
+                        console.warn(`未知的 HTTPS 参数键: ${key}`);
+                }
+            }
+            return params;
+        }
+
+        // 解析 HTTPS 记录的 data 字段
+        function parseHttpsRecord(data) {
+            const decoder = new TextDecoder("utf-8");
+            const hexDataMatch = data.match(/^\\#\s*\d+\s*([0-9a-fA-F\s]*)$/);
+            if (!hexDataMatch) {
+                return "无法解析 HTTPS 数据: 格式不匹配";
+            }
+            const hexData = hexDataMatch[1].replace(/\s/g, "");
+            const binaryData = hexToUint8Array(hexData);
+            
+            let offset = 0;
+
+            if (offset + 2 > binaryData.length) {
+                return "数据不足，无法读取优先级";
+            }
+            const priority = readUint16(binaryData, offset);
+            offset += 2;
+
+            if (offset >= binaryData.length) {
+                 return JSON.stringify({priority: priority, targetName: ".", params: {}}, null, 2);
+            }
+            
+            const targetNameLength = binaryData[offset];
+            offset += 1;
+            
+            if (offset + targetNameLength > binaryData.length) {
+                return "数据不足，无法读取目标名称";
+            }
+            
+            const targetName =
+                targetNameLength > 0
+                    ? decoder.decode(
+                          binaryData.slice(offset, offset + targetNameLength)
+                      )
+                    : ".";
+            offset += targetNameLength;
+
+            const params = parseParams(binaryData, offset, decoder);
+
+            return JSON.stringify({
+                priority,
+                targetName,
+                params
+            }, null, 2);
+        }
+
+        // 执行DNS查询
+        async function queryDnsOverHttps(domain, type = "A", dohServer = "https://cloudflare-dns.com/dns-query") {
+            if (!domain || typeof domain !== "string") {
+                throw new Error("无效的域名");
+            }
+            if (!type || typeof type !== "string") {
+                throw new Error("无效的记录类型");
+            }
+
+            const encodedDomain = encodeURIComponent(domain);
+            const cleanDohServer = dohServer.trim();
+            const url = `${cleanDohServer}?name=${encodedDomain}&type=${type}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/dns-json"
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP 错误! 状态: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // 如果是 HTTPS 记录，解析 data 字段
+                if (type.toUpperCase() === "HTTPS" && data.Answer) {
+                    data.Answer = data.Answer.map(answer => {
+                        if (answer.data && answer.data.startsWith("\\#")) {
+                            try {
+                                // 解析二进制格式的 data 字段
+                                answer.data_text = parseHttpsRecord(answer.data);
+                                // 标记原始 data 字段待移除
+                                answer._remove_raw_data = true;
+                            } catch (e) {
+                                console.error("解析 HTTPS 记录时出错:", e);
+                                answer.data_text = `解析错误: ${e.message}`;
+                            }
+                        }
+                        return answer;
+                    });
+                }
+
+                return data;
+            } catch (error) {
+                console.error("查询DNS数据时出错:", error);
+                throw new Error(`查询失败: ${error.message}`);
+            }
+        }
+
+        // --- 关键修改：处理并显示结果 ---
+        function displayResult(resultElement, resultObj) {
+            if (!resultObj) {
+                resultElement.textContent = "No result found.";
+                return;
+            }
+
+            // 1. 创建一个用于显示的副本对象
+            let displayObj;
+            try {
+                displayObj = JSON.parse(JSON.stringify(resultObj));
+            } catch (e) {
+                console.error("无法复制结果对象:", e);
+                resultElement.textContent = "显示结果时出错: 对象无法序列化";
+                return;
+            }
+
+            // 2. 预处理：移除 Answer 中的原始 data 字段
+            if (displayObj.Answer && Array.isArray(displayObj.Answer)) {
+                displayObj.Answer = displayObj.Answer.map(answer => {
+                     // 如果标记了移除，则删除原始 data 字段
+                     if (answer._remove_raw_data) {
+                         delete answer.data; // 删除原始的十六进制 data
+                         delete answer._remove_raw_data; // 删除标记
+                     }
+                     return answer;
+                });
+            }
+
+            // 3. 序列化为主 JSON 字符串
+            let resultString = JSON.stringify(displayObj, null, 2);
+
+            // 4. 特殊处理：将 result.Answer[*].data_text 中的 \n 和 \" 转义序列转换为真正的换行符和引号
+            // 使用更精确的正则表达式来匹配 data_text 的值
+            resultString = resultString.replace(
+                /("data_text"\s*:\s*")((?:[^"\\]|\\.)*?)(")/gs, // 使用 s 标志让 . 匹配换行符
+                (match, p1, p2, p3) => {
+                    // p1 是 "data_text": "
+                    // p2 是 data_text 的值 (可能包含 \\n, \\\", 等)
+                    // p3 是结尾的 "
+                    // 将值中的 \\n 替换为 \n, \\\" 替换为 \"
+                    let unescapedValue = p2.replace(/\\\\/g, '\\'); // 先处理双重转义 \\
+                    unescapedValue = unescapedValue.replace(/\\n/g, '\n'); // 处理 \n
+                    unescapedValue = unescapedValue.replace(/\\"/g, '"');  // 处理 \"
+                    return p1 + unescapedValue + p3;
+                }
+            );
+
+            // 5. 将处理后的字符串放入结果区域
+            resultElement.textContent = resultString;
+        }
+        // --- 关键修改结束 ---
+
+
+        // DOM元素
+        const dnsForm = document.getElementById('dnsForm');
+        const domainInput = document.getElementById('domain');
+        const typeSelect = document.getElementById('type');
+        const dohServerInput = document.getElementById('dohServer');
+        const resultElement = document.getElementById('result');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const sampleBtn = document.getElementById('sampleBtn');
+
+        // 事件监听器
+        dnsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const domain = domainInput.value.trim();
+            const type = typeSelect.value;
+            const dohServer = dohServerInput.value.trim() || "https://cloudflare-dns.com/dns-query";
+            
+            if (!domain) {
+                showNotification('请输入域名', 'error');
+                return;
+            }
+            
+            try {
+                resultElement.textContent = "查询中...";
+                const result = await queryDnsOverHttps(domain, type, dohServer);
+                // 使用新的 displayResult 函数
+                displayResult(resultElement, result);
+                showNotification('查询完成！');
+            } catch (error) {
+                resultElement.textContent = `错误: ${error.message}`;
+                showNotification(error.message, 'error');
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            if (resultElement.textContent === "查询结果将显示在这里...") {
+                showNotification('没有结果可复制', 'warning');
+                return;
+            }
+            
+            navigator.clipboard.writeText(resultElement.textContent)
+                .then(() => {
+                    showNotification('结果已复制到剪贴板');
+                })
+                .catch(err => {
+                    showNotification('复制失败: ' + err, 'error');
+                });
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (resultElement.textContent === "查询结果将显示在这里...") {
+                showNotification('没有结果可下载', 'warning');
+                return;
+            }
+            
+            const blob = new Blob([resultElement.textContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dns-result-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('结果已下载');
+        });
+
+        // 使用回原来位置的清空按钮
+        clearBtn.addEventListener('click', () => {
+            domainInput.value = '';
+            dohServerInput.value = '';
+            resultElement.textContent = '查询结果将显示在这里...';
+            domainInput.focus();
+            showNotification('已清空');
+        });
+
+        sampleBtn.addEventListener('click', () => {
+            domainInput.value = 'example.com';
+            typeSelect.value = 'HTTPS';
+            dohServerInput.value = '';
+            showNotification('已加载示例 (HTTPS 记录)');
+        });
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            domainInput.focus();
+        });
+    </script>
+</body>
+</html>
