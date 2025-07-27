@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP 地址生成器</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* === IP Generator 特定样式 === */
+        .ip-version-selector {
+            margin-bottom: 20px;
+        }
+
+        .bit-selector-grid {
+            display: grid;
+            grid-template-columns: repeat(32, 1fr); /* For IPv4 */
+            gap: 2px;
+            margin-top: 5px; /* 减小顶部边距 */
+            margin-bottom: 20px;
+            font-size: 0.75rem;
+        }
+        /* 为 IPv6 优化显示，分成多行 */
+        .bit-selector-grid.ipv6 {
+            grid-template-columns: repeat(16, 1fr); /* 16 bits per row */
+            grid-template-rows: repeat(8, auto); /* 8 rows */
+        }
+
+        .bit-selector-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .bit-selector-item label {
+            font-size: 0.65rem; /* 稍微减小字体 */
+            margin-top: 2px; /* 调整为 margin-top */
+            margin-bottom: 2px; /* 减小底部边距 */
+            font-weight: normal;
+            /* --- 关键修改：水平显示位索引 --- */
+            writing-mode: horizontal-tb; 
+            text-orientation: mixed;
+            height: auto; /* 自动高度 */
+            width: 100%; /* 占满容器宽度 */
+            text-align: center; /* 文本居中 */
+            overflow: hidden;
+            /* --- 修改结束 --- */
+        }
+
+        .bit-selector-item select {
+            width: 100%;
+            padding: 2px;
+            font-size: 0.7rem;
+            height: 25px;
+        }
+
+        .cidr-input-section {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f0f4f8;
+            border-radius: var(--border-radius);
+        }
+
+        .cidr-input-section label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .cidr-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cidr-input-group input, .cidr-input-group button {
+             flex: 1;
+             min-width: 150px;
+        }
+
+        .section-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        /* IPv6 段输入为一行 */
+        .section-inputs.ipv6 {
+            grid-template-columns: repeat(8, 1fr);
+        }
+
+        .section-input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-input-group label {
+            font-size: 0.85rem;
+            margin-bottom: 3px;
+        }
+
+        .section-input-group input, .section-input-group button {
+            padding: 6px 8px;
+            font-size: 0.9rem;
+        }
+
+        .apply-sections-btn {
+            grid-column: 1 / -1;
+            justify-self: start;
+            margin-top: 10px;
+        }
+
+        #outputIPs {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 50vh;
+            overflow-y: auto;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            margin-top: 3px;
+        }
+
+        .examples {
+            background: #f0fff4;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        .examples h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #2d3748;
+            font-size: 1.1rem;
+        }
+
+        .example-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .example-item {
+            background: #f7fafc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .example-input, .example-output {
+            display: block;
+            margin: 5px 0;
+        }
+
+        .example-separator {
+            text-align: center;
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+
+        .processing {
+            color: var(--secondary-color);
+            font-style: italic;
+        }
+
+        .warning {
+            color: var(--warning-color);
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* --- 新增：位字符串显示样式 --- */
+        #bitStringDisplay {
+            background-color: #f0f4f8;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow-x: auto;
+            margin-bottom: 15px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        /* --- 新增结束 --- */
+    </style>
+</head>
+<body>
+    <header>
+        <h1>IP 地址生成器</h1>
+        <p class="subtitle">根据 CIDR 预设或段输入快速生成 IPv4/IPv6 地址列表</p>
+    </header>
+    <div class="container">
+        <div class="panel">
+            <h2 class="panel-title">配置与输入</h2>
+            
+            <div class="ip-version-selector">
+                <label>选择 IP 版本:</label>
+                <select id="ipVersion">
+                    <option value="ipv4">IPv4</option>
+                    <option value="ipv6">IPv6</option>
+                </select>
+            </div>
+
+            <!-- CIDR Input Section -->
+            <div class="cidr-input-section">
+                <label for="cidrInput">1. 使用 CIDR 预填充位选择器 (可选):</label>
+                <div class="cidr-input-group">
+                    <input type="text" id="cidrInput" placeholder="例如: 192.168.1.0/24 或 2001:db8::/32">
+                    <button id="applyCidrBtn">应用 CIDR</button>
+                </div>
+            </div>
+
+            <!-- Section-wise Input for IPv4 -->
+            <div id="ipv4SectionInputs" class="section-inputs">
+                <h3 style="grid-column: 1 / -1;">2. 调整 IPv4 段 (可选):</h3>
+                <div class="section-input-group">
+                    <label for="section0Input_v4">第 1 段 (0-255/CIDR):</label>
+                    <input type="text" id="section0Input_v4" placeholder="例如: 151 或 128/7">
+                </div>
+                <div class="section-input-group">
+                    <label for="section1Input_v4">第 2 段 (0-255/CIDR):</label>
+                    <input type="text" id="section1Input_v4" placeholder="例如: 101 或 0/4">
+                </div>
+                <div class="section-input-group">
+                    <label for="section2Input_v4">第 3 段 (0-255/CIDR):</label>
+                    <input type="text" id="section2Input_v4" placeholder="例如: 0 或 128/7">
+                </div>
+                <div class="section-input-group">
+                    <label for="section3Input_v4">第 4 段 (0-255/CIDR):</label>
+                    <input type="text" id="section3Input_v4" placeholder="例如: 133 或 128/7">
+                </div>
+                <button id="applySectionsBtn_v4" class="apply-sections-btn">应用 IPv4 段设置</button>
+            </div>
+
+            <!-- Section-wise Input for IPv6 -->
+            <div id="ipv6SectionInputs" class="section-inputs ipv6 hidden">
+                <h3 style="grid-column: 1 / -1;">2. 调整 IPv6 段 (十六进制/CIDR):</h3>
+                <div class="section-input-group">
+                    <label for="section0Input_v6">段 1 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section0Input_v6" placeholder="例如: 2001 或 1000/4">
+                </div>
+                <div class="section-input-group">
+                    <label for="section1Input_v6">段 2 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section1Input_v6" placeholder="例如: db8 或 0/16">
+                </div>
+                <div class="section-input-group">
+                    <label for="section2Input_v6">段 3 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section2Input_v6" placeholder="例如: 1234 或 1000/12">
+                </div>
+                <div class="section-input-group">
+                    <label for="section3Input_v6">段 4 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section3Input_v6" placeholder="例如: 5678 或 0/8">
+                </div>
+                <div class="section-input-group">
+                    <label for="section4Input_v6">段 5 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section4Input_v6" placeholder="例如: abcd 或 8000/1">
+                </div>
+                <div class="section-input-group">
+                    <label for="section5Input_v6">段 6 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section5Input_v6" placeholder="例如: ef01 或 0/16">
+                </div>
+                <div class="section-input-group">
+                    <label for="section6Input_v6">段 7 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section6Input_v6" placeholder="例如: 2345 或 0/16">
+                </div>
+                <div class="section-input-group">
+                    <label for="section7Input_v6">段 8 (0000-ffff/CIDR):</label>
+                    <input type="text" id="section7Input_v6" placeholder="例如: 6789 或 0/16">
+                </div>
+                <button id="applySectionsBtn_v6" class="apply-sections-btn">应用 IPv6 段设置</button>
+            </div>
+
+            <!-- Bit Selectors -->
+            <div id="bitSelectors">
+                <!-- Bit selectors will be dynamically generated here -->
+            </div>
+
+            <div class="controls">
+                <button id="generateBtn">生成 IP</button>
+                <button id="clearInputBtn" class="btn-clear">清空输入</button>
+                <button id="loadSampleBtn">加载示例</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2 class="panel-title">输出结果</h2>
+            <div class="controls">
+                <button id="copyOutputBtn">复制结果</button>
+                <button id="downloadOutputBtn" class="btn-secondary">下载结果</button>
+                <button id="clearOutputBtn" class="btn-clear">清空输出</button>
+            </div>
+            
+            <!-- --- 新增：位字符串显示区域 --- -->
+            <div id="bitStringDisplay">
+                <!-- 位字符串将在这里动态生成 -->
+                位字符串将在此显示...
+            </div>
+            <!-- --- 新增结束 --- -->
+
+            <div id="statsContainer" class="stats" style="display: none;">
+                <h3>统计信息</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalGenerated">0</div>
+                        <div class="stat-label">生成数量</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="generationTime">0ms</div>
+                        <div class="stat-label">耗时</div>
+                    </div>
+                </div>
+            </div>
+            <div id="warningMessage" class="warning" style="display: none;"></div>
+            <textarea id="outputIPs" placeholder="生成的 IP 地址将显示在这里，每行一个" readonly></textarea>
+        </div>
+    </div>
+    
+    <div class="examples">
+        <h3>使用示例</h3>
+        <div class="example-list">
+            <div class="example-item">
+                <strong>IPv4: 生成特定模式</strong>
+                <span class="example-input">1. CIDR: 151.1.0.0/16</span>
+                <span class="example-input">2. 第4段: 133</span>
+                <div class="example-separator">↓</div>
+                <span class="example-output">151.1.0.133</span>
+                <span class="example-output">151.1.1.133</span>
+                <span class="example-output">...</span>
+                <span class="example-output">151.1.255.133</span>
+            </div>
+            <div class="example-item">
+                <strong>IPv6: 生成特定模式</strong>
+                <span class="example-input">1. CIDR: 2001:db8::/32</span>
+                <span class="example-input">2. 段3: abcd</span>
+                <span class="example-input">3. 段8: 1/4 (即 0001, 0002, ..., 0010)</span>
+                <div class="example-separator">↓</div>
+                <span class="example-output">2001:db8:abcd::1</span>
+                <span class="example-output">2001:db8:abcd::2</span>
+                <span class="example-output">...</span>
+                <span class="example-output">2001:db8:abcd::10</span>
+            </div>
+            <div class="example-item">
+                <strong>IPv4: 段内范围生成</strong>
+                <span class="example-input">1. CIDR: 192.168.0.0/16</span>
+                <span class="example-input">2. 第3段: 10/8 (即 192.168.10.*)</span>
+                <span class="example-input">3. 第4段: 1/2 (即 *.1, *.2, *.3)</span>
+                <div class="example-separator">↓</div>
+                <span class="example-output">192.168.10.1</span>
+                <span class="example-output">192.168.10.2</span>
+                <span class="example-output">192.168.10.3</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+    
+    <footer>
+        <p>IP 地址生成器 | 支持 IPv4 和 IPv6 | 基于 CIDR 预设和段输入</p>
+    </footer>
+
+    <script>
+        // 显示通知
+        function showNotification(message, isSuccess = true) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${isSuccess ? 'success' : 'error'}`;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // --- IPv4 处理 ---
+        function ipv4ToBigInt(ip) {
+            const parts = ip.split('.').map(Number);
+            if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
+                throw new Error(`无效的 IPv4 地址: ${ip}`);
+            }
+            return (BigInt(parts[0]) << 24n) + (BigInt(parts[1]) << 16n) + (BigInt(parts[2]) << 8n) + BigInt(parts[3]);
+        }
+
+        function bigIntToIPv4(bigInt) {
+            return `${(bigInt >> 24n) & 0xFFn}.${(bigInt >> 16n) & 0xFFn}.${(bigInt >> 8n) & 0xFFn}.${bigInt & 0xFFn}`;
+        }
+
+        function prefixLengthToMaskIPv4(prefixLen) {
+            if (prefixLen === 0) return 0n;
+            return (~0n) << (32n - BigInt(prefixLen));
+        }
+
+        // --- IPv6 处理 ---
+        function ipv6ToBigInt(ip) {
+            let fullAddr = ip;
+            if (ip.includes('::')) {
+                const parts = ip.split('::');
+                const leftParts = parts[0] ? parts[0].split(':') : [];
+                const rightParts = parts[1] ? parts[1].split(':') : [];
+                const missingParts = 8 - leftParts.length - rightParts.length;
+                if (missingParts < 0) throw new Error(`无效的 IPv6 地址: ${ip}`);
+                const zeros = Array(missingParts).fill('0');
+                const allParts = [...leftParts, ...zeros, ...rightParts];
+                fullAddr = allParts.join(':');
+            }
+            const parts = fullAddr.split(':');
+            if (parts.length !== 8) throw new Error(`无效的 IPv6 地址: ${ip}`);
+            let result = 0n;
+            for (let i = 0; i < 8; i++) {
+                const part = parts[i];
+                if (part.length > 4) throw new Error(`无效的 IPv6 地址段: ${part}`);
+                const value = BigInt(`0x${part.padStart(4, '0')}`);
+                result = (result << 16n) + value;
+            }
+            return result;
+        }
+
+        function bigIntToIPv6(bigInt) {
+            const parts = [];
+            for (let i = 0; i < 8; i++) {
+                const part = (bigInt >> BigInt(112 - i * 16)) & 0xFFFFn;
+                parts.push(part.toString(16).padStart(4, '0'));
+            }
+            return parts.join(':');
+        }
+
+        function prefixLengthToMaskIPv6(prefixLen) {
+            if (prefixLen === 0) return 0n;
+            const fullMask = (1n << 128n) - 1n;
+            return fullMask << (128n - BigInt(prefixLen));
+        }
+
+        // --- CIDR 解析 ---
+        function parseCIDR(cidrString) {
+            let addressPart, prefixPart;
+            const trimmedInput = cidrString.trim();
+            if (trimmedInput.includes('/')) {
+                const parts = trimmedInput.split('/');
+                addressPart = parts[0];
+                prefixPart = parts[1];
+            } else {
+                addressPart = trimmedInput;
+                prefixPart = addressPart.includes(':') ? '128' : '32';
+            }
+
+            const prefixLength = parseInt(prefixPart, 10);
+            if (isNaN(prefixLength) || prefixLength < 0) {
+                throw new Error(`无效的前缀长度: ${cidrString}`);
+            }
+
+            let start, end, version;
+            if (addressPart.includes(':')) {
+                version = 6;
+                if (prefixLength > 128) throw new Error(`IPv6 前缀长度超出范围 (0-128): ${cidrString}`);
+                start = ipv6ToBigInt(addressPart);
+                const mask = prefixLengthToMaskIPv6(prefixLength);
+                end = start | (~mask & ((1n << 128n) - 1n));
+            } else {
+                version = 4;
+                if (prefixLength > 32) throw new Error(`IPv4 前缀长度超出范围 (0-32): ${cidrString}`);
+                start = ipv4ToBigInt(addressPart);
+                const mask = prefixLengthToMaskIPv4(prefixLength);
+                end = start | (~mask & 0xFFFFFFFFn);
+            }
+            return { start, end, version, prefixLength };
+        }
+
+        // --- 位选择生成 ---
+        function generateFromBits(version, bitSelectors) {
+            const totalBits = version === 4 ? 32 : 128;
+            let fixedBits = 0n;
+            let mask = 0n; // 1 for fixed bits, 0 for variable bits
+
+            for (let i = 0; i < totalBits; i++) {
+                const value = bitSelectors[i].value;
+                if (value === '0' || value === '1') {
+                    mask |= (1n << BigInt(totalBits - 1 - i));
+                    if (value === '1') {
+                        fixedBits |= (1n << BigInt(totalBits - 1 - i));
+                    }
+                }
+                // If value is 'x', do nothing, bit remains 0 in mask and fixedBits
+            }
+
+            const addresses = [];
+            const variableBitCount = totalBits - popCount(mask); // Count of 'x' bits
+            
+            // --- 性能优化：设置更合理的上限 ---
+            if (variableBitCount > 20) { // 2^20 = 1,048,576
+                 throw new Error(`位选择生成的组合数过多 (${variableBitCount} 个变量位)。请减少 'x' 的数量。`);
+            }
+            // --- 优化结束 ---
+
+            const maxCombinations = 1n << BigInt(variableBitCount);
+
+            for (let i = 0n; i < maxCombinations; i++) {
+                let addr = fixedBits;
+                let shift = 0n;
+                for (let j = 0; j < totalBits; j++) {
+                    if ((mask & (1n << BigInt(totalBits - 1 - j))) === 0n) {
+                        // This bit is variable ('x')
+                        const bitValue = (i >> shift) & 1n;
+                        addr |= (bitValue << BigInt(totalBits - 1 - j));
+                        shift++;
+                    }
+                }
+                addresses.push(version === 4 ? bigIntToIPv4(addr) : bigIntToIPv6(addr));
+                
+                // --- 性能优化：定期让出主线程 ---
+                if (addresses.length % 10000 === 0) {
+                     // 使用 await 可以让浏览器处理其他任务，但会显著减慢生成速度
+                     // 更好的方式是在循环外部使用 setTimeout，但这会打断逻辑流
+                     // 这里采用一个折中方案：对于大数量，给出提示并允许用户取消
+                     if (addresses.length > 100000) {
+                         console.warn(`已生成 ${addresses.length} 个地址...`);
+                     }
+                }
+                // --- 优化结束 ---
+            }
+            return addresses;
+        }
+
+        // Helper function to count 1-bits in a BigInt (population count)
+        function popCount(n) {
+            let count = 0n;
+            while (n) {
+                count += n & 1n;
+                n >>= 1n;
+            }
+            return Number(count);
+        }
+
+        // --- 核心生成逻辑 ---
+        async function generateIPs() {
+            const outputArea = document.getElementById('outputIPs');
+            const statsContainer = document.getElementById('statsContainer');
+            const warningMessage = document.getElementById('warningMessage');
+            const totalGeneratedElement = document.getElementById('totalGenerated');
+            const generationTimeElement = document.getElementById('generationTime');
+
+            const ipVersion = document.getElementById('ipVersion').value;
+            const bitSelectors = document.querySelectorAll('#bitSelectors select');
+
+            if (bitSelectors.length === 0) {
+                showNotification('请配置位选择器', false);
+                return;
+            }
+
+            outputArea.value = '处理中...';
+            outputArea.classList.add('processing');
+            statsContainer.style.display = 'none';
+            warningMessage.style.display = 'none';
+            warningMessage.textContent = '';
+
+            const startTime = performance.now();
+
+            // --- 性能优化：使用 setTimeout 包裹核心逻辑 ---
+            setTimeout(async () => {
+                try {
+                    let allAddresses = [];
+
+                    if (bitSelectors.length > 0) {
+                        allAddresses = generateFromBits(ipVersion === 'ipv4' ? 4 : 6, bitSelectors);
+                    }
+
+                    const endTime = performance.now();
+                    const duration = (endTime - startTime).toFixed(2);
+
+                    // --- 性能优化：分批渲染结果 ---
+                    const batchSize = 10000;
+                    let index = 0;
+                    outputArea.value = '';
+                    outputArea.classList.remove('processing');
+
+                    function appendBatch() {
+                        const batchEnd = Math.min(index + batchSize, allAddresses.length);
+                        const batchText = allAddresses.slice(index, batchEnd).join('\n') + (batchEnd < allAddresses.length ? '\n' : '');
+                        outputArea.value += batchText;
+                        index = batchEnd;
+
+                        if (index < allAddresses.length) {
+                            // 继续下一批
+                            setTimeout(appendBatch, 0);
+                        } else {
+                            // 全部完成
+                            totalGeneratedElement.textContent = allAddresses.length.toLocaleString();
+                            generationTimeElement.textContent = `${duration}ms`;
+                            statsContainer.style.display = 'block';
+
+                            if (allAddresses.length > 50000) {
+                                warningMessage.textContent = `生成了 ${allAddresses.length.toLocaleString()} 个地址。复制或下载可能需要较长时间。`;
+                                warningMessage.style.display = 'block';
+                            }
+
+                            showNotification(`成功生成 ${allAddresses.length.toLocaleString()} 个 IP 地址！耗时 ${duration}ms`);
+                        }
+                    }
+
+                    appendBatch(); // 开始追加
+                    // --- 优化结束 ---
+
+                } catch (error) {
+                    outputArea.value = `处理错误: ${error.message}`;
+                    outputArea.classList.remove('processing');
+                    showNotification(error.message, false);
+                }
+            }, 50); // 50ms 延迟确保 UI 更新
+            // --- 优化结束 ---
+        }
+
+        // --- UI 动态生成和交互 ---
+        let currentBitValues = Array(128).fill('x'); // Stores current state of bit selectors
+
+        // --- 新增：更新位字符串显示的函数 ---
+        function updateBitStringDisplay() {
+            const ipVersion = document.getElementById('ipVersion').value;
+            const bitStringDisplay = document.getElementById('bitStringDisplay');
+            const totalBits = ipVersion === 'ipv4' ? 32 : 128;
+            const prefix = ipVersion === 'ipv4' ? '4:' : '6:';
+            
+            let bitString = '';
+            for (let i = 0; i < totalBits; i++) {
+                bitString += currentBitValues[i];
+            }
+            bitStringDisplay.textContent = prefix + bitString;
+        }
+        // --- 新增结束 ---
+
+        function updateBitSelectors() {
+            const ipVersion = document.getElementById('ipVersion').value;
+            const bitSelectorsDiv = document.getElementById('bitSelectors');
+            const totalBits = ipVersion === 'ipv4' ? 32 : 128;
+
+            bitSelectorsDiv.innerHTML = '<label>二进制位选择器:</label>';
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'bit-selector-grid';
+            
+            // --- 关键修复：正确添加/移除 IPv6 类名 ---
+            if (ipVersion === 'ipv6') {
+                gridDiv.classList.add('ipv6');
+            } else {
+                gridDiv.classList.remove('ipv6'); // 确保切换回 IPv4 时移除
+            }
+            // --- 修复结束 ---
+
+            for (let i = 0; i < totalBits; i++) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'bit-selector-item';
+
+                const label = document.createElement('label');
+                label.textContent = `${i}`;
+                label.htmlFor = `bit-${i}`;
+
+                const select = document.createElement('select');
+                select.id = `bit-${i}`;
+                select.innerHTML = `
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="x" selected>x</option>
+                `;
+                // Set the value based on the stored state
+                if (i < currentBitValues.length) {
+                    select.value = currentBitValues[i];
+                }
+
+                // Update stored state and bit string display on change
+                select.addEventListener('change', (e) => {
+                    currentBitValues[i] = e.target.value;
+                    // --- 新增：在位选择器变化时更新位字符串显示 ---
+                    updateBitStringDisplay();
+                    // --- 新增结束 ---
+                });
+
+                itemDiv.appendChild(label);
+                itemDiv.appendChild(select);
+                gridDiv.appendChild(itemDiv);
+            }
+            bitSelectorsDiv.appendChild(gridDiv);
+
+            // Show/Hide section inputs based on version
+            document.getElementById('ipv4SectionInputs').classList.toggle('hidden', ipVersion !== 'ipv4');
+            document.getElementById('ipv6SectionInputs').classList.toggle('hidden', ipVersion !== 'ipv6');
+            // Ensure correct class for IPv6 section inputs
+            document.getElementById('ipv6SectionInputs').classList.toggle('ipv6', ipVersion === 'ipv6');
+            
+            // --- 新增：在更新位选择器后也更新位字符串显示 ---
+            updateBitStringDisplay();
+            // --- 新增结束 ---
+        }
+
+        function applyCidrToBits() {
+            const cidrInput = document.getElementById('cidrInput').value.trim();
+            if (!cidrInput) {
+                showNotification('请输入 CIDR', false);
+                return;
+            }
+            try {
+                const { start, end, version, prefixLength } = parseCIDR(cidrInput);
+                const ipVersion = document.getElementById('ipVersion').value;
+                
+                // --- 关键修复：更严格的版本检查 ---
+                if ((version === 4 && ipVersion !== 'ipv4') || (version === 6 && ipVersion !== 'ipv6')) {
+                     showNotification(`CIDR 版本与当前选择不匹配`, false);
+                     return; // 直接返回，不执行后续逻辑
+                }
+                // --- 修复结束 ---
+
+                const totalBits = version === 4 ? 32 : 128;
+                const mask = version === 4 ? prefixLengthToMaskIPv4(prefixLength) : prefixLengthToMaskIPv6(prefixLength);
+
+                for (let i = 0; i < totalBits; i++) {
+                    const bitMask = 1n << BigInt(totalBits - 1 - i);
+                    if ((mask & bitMask) !== 0n) {
+                        // Fixed bit
+                        const bitValue = (start & bitMask) !== 0n ? '1' : '0';
+                        currentBitValues[i] = bitValue;
+                    } else {
+                        // Variable bit
+                        currentBitValues[i] = 'x';
+                    }
+                }
+                updateBitSelectors(); // Refresh UI with new values
+                showNotification('CIDR 已应用到位选择器');
+            } catch (e) {
+                showNotification(`应用 CIDR 失败: ${e.message}`, false);
+            }
+        }
+
+        // --- 修复后的段编辑器逻辑 ---
+        // 通用函数，处理 IPv4 和 IPv6 的段 CIDR 应用
+        // sectionIndex: 段索引 (0-3 for IPv4, 0-7 for IPv6)
+        // input: 用户输入 (e.g., "133", "128/7")
+        // bitsPerSection: 每段的位数 (8 for IPv4, 16 for IPv6)
+        function applySectionCidr(sectionIndex, input, bitsPerSection) {
+            // --- 关键修改：只有当输入不为空时才处理 ---
+            const trimmedInput = input.trim();
+            if (trimmedInput === '') {
+                // 如果输入为空（包括只有空格），则不修改该段的任何位
+                return;
+            }
+            // --- 修改结束 ---
+
+            let valueStr, prefixLenStr;
+            if (trimmedInput.includes('/')) {
+                const parts = trimmedInput.split('/');
+                valueStr = parts[0];
+                prefixLenStr = parts[1];
+            } else {
+                valueStr = trimmedInput;
+                prefixLenStr = bitsPerSection.toString(); // 默认为全位固定
+            }
+            
+            let value, prefixLen;
+            if (bitsPerSection === 8) { // IPv4
+                value = parseInt(valueStr, 10);
+                prefixLen = parseInt(prefixLenStr, 10);
+                if (isNaN(value) || isNaN(prefixLen) || value < 0 || value > 255 || prefixLen < 0 || prefixLen > 8) {
+                    throw new Error(`段 ${sectionIndex + 1} 输入无效: ${input}`);
+                }
+            } else { // IPv6
+                // 验证十六进制字符串
+                if (!/^[0-9a-fA-F]{1,4}$/.test(valueStr)) {
+                    throw new Error(`段 ${sectionIndex + 1} 输入无效 (非十六进制): ${input}`);
+                }
+                value = parseInt(valueStr, 16);
+                prefixLen = parseInt(prefixLenStr, 10);
+                if (isNaN(value) || isNaN(prefixLen) || value < 0 || value > 0xFFFF || prefixLen < 0 || prefixLen > 16) {
+                    throw new Error(`段 ${sectionIndex + 1} 输入无效: ${input}`);
+                }
+            }
+
+            const sectionValue = value;
+            // 计算该段的掩码：高 prefixLen 位为 1，其余为 0
+            const mask = (~0) << (bitsPerSection - prefixLen);
+
+            // 应用该段的 CIDR 到对应的位
+            for (let j = 0; j < bitsPerSection; j++) {
+                const bitIndex = sectionIndex * bitsPerSection + j;
+                const bitMask = 1 << (bitsPerSection - 1 - j); // 从高位到低位
+                if ((mask & bitMask) !== 0) {
+                    // 固定位：根据 value 设置 0 或 1
+                    currentBitValues[bitIndex] = (sectionValue & bitMask) ? '1' : '0';
+                } else {
+                    // 可变位：设为 'x'
+                    currentBitValues[bitIndex] = 'x';
+                }
+            }
+        }
+
+        function applySectionsToBits_v4() {
+             const ipVersion = document.getElementById('ipVersion').value;
+             if (ipVersion !== 'ipv4') {
+                 showNotification('IPv4 段输入功能仅在 IPv4 模式下可用', false);
+                 return;
+             }
+
+             const sections = [];
+             for (let i = 0; i < 4; i++) {
+                 sections.push(document.getElementById(`section${i}Input_v4`).value);
+             }
+
+             try {
+                 for (let i = 0; i < 4; i++) {
+                     // --- 关键点：传递原始输入，函数内部处理 trim 和空值 ---
+                     applySectionCidr(i, sections[i], 8); // IPv4 每段 8 位
+                 }
+                 updateBitSelectors();
+                 showNotification('IPv4 段设置已应用');
+             } catch (e) {
+                 showNotification(e.message, false);
+             }
+        }
+
+        function applySectionsToBits_v6() {
+             const ipVersion = document.getElementById('ipVersion').value;
+             if (ipVersion !== 'ipv6') {
+                 showNotification('IPv6 段输入功能仅在 IPv6 模式下可用', false);
+                 return;
+             }
+
+             const sections = [];
+             for (let i = 0; i < 8; i++) {
+                 sections.push(document.getElementById(`section${i}Input_v6`).value);
+             }
+
+             try {
+                 for (let i = 0; i < 8; i++) {
+                     // --- 关键点：传递原始输入，函数内部处理 trim 和空值 ---
+                     applySectionCidr(i, sections[i], 16); // IPv6 每段 16 位
+                 }
+                 updateBitSelectors();
+                 showNotification('IPv6 段设置已应用');
+             } catch (e) {
+                 showNotification(e.message, false);
+             }
+        }
+        // --- 修复结束 ---
+
+
+        // --- 事件监听器 ---
+        document.getElementById('ipVersion').addEventListener('change', () => {
+            currentBitValues = Array(128).fill('x');
+            updateBitSelectors();
+        });
+        document.getElementById('applyCidrBtn').addEventListener('click', applyCidrToBits);
+        document.getElementById('applySectionsBtn_v4').addEventListener('click', applySectionsToBits_v4);
+        document.getElementById('applySectionsBtn_v6').addEventListener('click', applySectionsToBits_v6);
+        document.getElementById('generateBtn').addEventListener('click', generateIPs);
+
+        document.getElementById('clearInputBtn').addEventListener('click', () => {
+            document.getElementById('cidrInput').value = '';
+            for(let i=0; i<4; i++) {
+                document.getElementById(`section${i}Input_v4`).value = '';
+            }
+            for(let i=0; i<8; i++) {
+                document.getElementById(`section${i}Input_v6`).value = '';
+            }
+            currentBitValues = Array(128).fill('x');
+            updateBitSelectors();
+            document.getElementById('cidrInput').focus();
+            showNotification('输入已清空');
+        });
+
+        document.getElementById('clearOutputBtn').addEventListener('click', () => {
+            document.getElementById('outputIPs').value = '';
+            document.getElementById('statsContainer').style.display = 'none';
+            document.getElementById('warningMessage').style.display = 'none';
+            showNotification('输出已清空');
+        });
+
+        document.getElementById('copyOutputBtn').addEventListener('click', () => {
+            const outputArea = document.getElementById('outputIPs');
+            if (!outputArea.value || outputArea.classList.contains('processing')) {
+                showNotification('没有结果可复制', false);
+                return;
+            }
+            outputArea.select();
+            document.execCommand('copy');
+            showNotification('结果已复制到剪贴板');
+        });
+
+        document.getElementById('downloadOutputBtn').addEventListener('click', () => {
+            const outputArea = document.getElementById('outputIPs');
+            if (!outputArea.value || outputArea.classList.contains('processing')) {
+                showNotification('没有结果可下载', false);
+                return;
+            }
+            const blob = new Blob([outputArea.value], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'generated_ips.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification('结果已下载');
+        });
+
+        document.getElementById('loadSampleBtn').addEventListener('click', () => {
+             const ipVersion = document.getElementById('ipVersion').value;
+             if (ipVersion === 'ipv4') {
+                 document.getElementById('cidrInput').value = '151.1.0.0/16';
+                 applyCidrToBits();
+                 document.getElementById('section3Input_v4').value = '133';
+                 applySectionsToBits_v4();
+             } else {
+                 document.getElementById('cidrInput').value = '2001:db8::/32';
+                 applyCidrToBits();
+                 document.getElementById('section2Input_v6').value = 'abcd';
+                 document.getElementById('section7Input_v6').value = '1/4';
+                 applySectionsToBits_v6();
+             }
+             showNotification(`示例配置 (${ipVersion.toUpperCase()}) 已加载`);
+        });
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            updateBitSelectors();
+            document.getElementById('cidrInput').focus();
+        });
+    </script>
+</body>
+</html>
