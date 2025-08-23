@@ -85,6 +85,63 @@
     <div id="notification" class="notification"></div>
 
     <script>
+		document.getElementById('domain').addEventListener('blur', function() {
+		  const original = this.value;
+		  const input = original.trim();
+		  if (!input) return;
+
+		  // 跳过以单'/'开头的相对路径（无法提取域名）
+		  if (input.startsWith('/') && !input.startsWith('//')) {
+			return;
+		  }
+
+		  try {
+			let str = input;
+			
+			// 处理协议（包括无效协议如 ps://）
+			if (str.includes('://')) {
+			  str = str.substring(str.lastIndexOf('://') + 3);
+			} 
+			// 处理协议相对路径 (//example.com)
+			else if (str.startsWith('//')) {
+			  str = str.substring(2);
+			}
+
+			// 提取第一个/之前的部分（主机名+端口+用户名）
+			let host = str.split('/')[0];
+			
+			// 处理用户名密码 (user:pass@example.com → example.com)
+			if (host.includes('@')) {
+			  host = host.substring(host.lastIndexOf('@') + 1);
+			}
+			
+			// 移除端口 (example.com:8080 → example.com)
+			host = host.split(':')[0];
+			
+			// 移除末尾点 (example.com. → example.com)
+			host = host.replace(/\.$/, '');
+			
+			// 转为小写（DNS标准）
+			host = host.toLowerCase();
+
+			// 仅当提取成功且与原始输入不同时更新
+			if (host && host !== input.toLowerCase().replace(/\.$/, '')) {
+			  this.value = host;
+			}
+		  } catch (e) {
+			console.warn('域名处理异常:', e.message);
+		  }
+		});
+
+		// 可选：添加防抖输入验证（输入停止300ms后触发）
+		let inputDebounce;
+		document.getElementById('domain').addEventListener('input', function() {
+		  clearTimeout(inputDebounce);
+		  inputDebounce = setTimeout(() => {
+			const event = new Event('blur');
+			this.dispatchEvent(event);
+		  }, 300);
+		});
         // 显示通知
         function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
