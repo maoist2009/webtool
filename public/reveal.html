@@ -291,23 +291,13 @@
       </aside>
 
       <!-- Main Content Area -->
-      <div id="mainContent" class="flex-1 min-h-0 flex flex-col md:flex-row">
-        <!-- Editor Panel -->
-        <section id="editorPanel" class="panel flex-1 min-h-0 flex flex-col border-b md:border-b-0 md:border-r border-slate-800">
-          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span id="currentFileName" class="text-xs text-slate-300 font-medium truncate"></span>
-            <div class="ml-auto text-xs text-slate-500">Ctrl+S 保存</div>
-          </div>
-          <div class="flex-1 min-h-0" id="editor"></div>
-        </section>
-
-        <!-- Preview Panel -->
-        <section id="previewPanel" class="panel flex-1 min-h-0 flex flex-col">
-          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
+      <div id="mainContent" class="flex-1 min-h-0 flex flex-col-reverse md:flex-row">
+        <!-- Preview Panel (在移动端放上面，桌面端放右边) -->
+        <section id="previewPanel" class="panel flex-1 min-h-0 flex flex-col order-first md:order-last">
+          <div class="px-3 py-1.5 border-b md:border-b border-t md:border-t-0 border-slate-800 bg-slate-900/50 flex items-center gap-2">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             <span class="text-xs text-slate-300 font-medium">预览</span>
-            <span class="text-xs text-slate-500">方向键翻页</span>
+            <span class="text-xs text-slate-500 hidden sm:inline">方向键翻页</span>
             <div class="ml-auto flex items-center gap-1">
               <button id="btnFullscreen" class="btn sm" title="全屏放映 (Alt+Enter)">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
@@ -320,6 +310,16 @@
               <div id="slides" class="slides"></div>
             </div>
           </div>
+        </section>
+
+        <!-- Editor Panel (在移动端放下面，桌面端放左边) -->
+        <section id="editorPanel" class="panel flex-1 min-h-0 flex flex-col order-last md:order-first md:border-r border-slate-800">
+          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="currentFileName" class="text-xs text-slate-300 font-medium truncate"></span>
+            <div class="ml-auto text-xs text-slate-500">Ctrl+S 保存</div>
+          </div>
+          <div class="flex-1 min-h-0" id="editor"></div>
         </section>
       </div>
 
@@ -995,6 +995,12 @@ console.log('Hello Reveal.js!')
           try {
             const data = JSON.parse(reader.result);
             if (!data.workspace || !data.workspace.files) throw new Error('Invalid');
+            
+            // 重要：先清除当前的 activeFileId，防止 loadFile 时保存旧内容到新工作区
+            const oldActiveId = workspace.activeFileId;
+            workspace.activeFileId = null;
+            
+            // 替换为新工作区
             workspace = data.workspace;
             if (data.settings) {
               settings = { ...settings, ...data.settings };
@@ -1003,11 +1009,26 @@ console.log('Hello Reveal.js!')
             saveWorkspace();
             renderFileTree();
             
-            if (workspace.activeFileId && workspace.files[workspace.activeFileId]) {
-              loadFile(workspace.activeFileId);
-            } else {
+            // 加载活动文件（不会触发保存旧内容，因为上面已经处理了）
+            let targetFileId = workspace.activeFileId;
+            if (!targetFileId || !workspace.files[targetFileId]) {
               const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file');
-              if (files.length > 0) loadFile(files[0][0]);
+              targetFileId = files.length > 0 ? files[0][0] : null;
+            }
+            
+            if (targetFileId && workspace.files[targetFileId]) {
+              // 直接设置编辑器内容，不通过 loadFile（避免保存旧内容）
+              workspace.activeFileId = targetFileId;
+              const file = workspace.files[targetFileId];
+              cm.setValue(file.content || '');
+              $('#currentFileName').textContent = file.name;
+              setDirty(false);
+              saveWorkspace();
+              renderFileTree();
+              requestPreviewUpdate();
+            } else {
+              cm.setValue('');
+              $('#currentFileName').textContent = '';
             }
             
             toast('已导入工作区');
