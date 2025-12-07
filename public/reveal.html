@@ -231,9 +231,21 @@
               </button>
             </div>
             <div id="annotationToolbar">
-              <button class="anno-btn active" data-tool="pointer" title="指针"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg></button>
+              <!-- 指针 -->
+              <button class="anno-btn active" data-tool="pointer" title="指针（操作幻灯片）"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg></button>
+              <!-- 画笔 -->
               <button class="anno-btn" data-tool="pen" title="画笔"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg></button>
+              <!-- 荧光笔 -->
+              <button class="anno-btn" data-tool="highlighter" title="荧光笔"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l-6 6v3h9l3-3"/><path d="M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+              <!-- 直线 -->
+              <button class="anno-btn" data-tool="line" title="直线"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5"/></svg></button>
+              <!-- 矩形 -->
+              <button class="anno-btn" data-tool="rect" title="矩形"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></button>
+              <!-- 椭圆 -->
+              <button class="anno-btn" data-tool="ellipse" title="椭圆"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
+              <!-- 箭头 -->
               <button class="anno-btn" data-tool="arrow" title="箭头"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+              <!-- 橡皮擦 -->
               <button class="anno-btn" data-tool="eraser" title="橡皮擦"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1L13.1 3.8c.6-.6 1.5-.6 2.1 0L21 9.5c.6.6.6 1.5 0 2.1L12 20"/></svg></button>
               <div class="anno-divider"></div>
               <div class="relative">
@@ -244,14 +256,21 @@
                   <div class="color-btn" data-color="#22c55e" style="background: #22c55e"></div>
                   <div class="color-btn" data-color="#eab308" style="background: #eab308"></div>
                   <div class="color-btn" data-color="#ffffff" style="background: #ffffff"></div>
+                  <div class="color-btn" data-color="#f97316" style="background: #f97316"></div>
+                  <div class="color-btn" data-color="#a855f7" style="background: #a855f7"></div>
+                  <div class="color-btn" data-color="#06b6d4" style="background: #06b6d4"></div>
+                  <div class="color-btn" data-color="#ec4899" style="background: #ec4899"></div>
+                  <div class="color-btn" data-color="#000000" style="background: #000000; border-color: #666;"></div>
                   <div class="width-btn">
-                    <div class="stroke-dot active" data-width="3" style="width: 8px; height: 8px;"></div>
-                    <div class="stroke-dot" data-width="6" style="width: 12px; height: 12px;"></div>
-                    <div class="stroke-dot" data-width="10" style="width: 16px; height: 16px;"></div>
+                    <div class="stroke-dot" data-width="2" style="width: 6px; height: 6px;"></div>
+                    <div class="stroke-dot active" data-width="4" style="width: 10px; height: 10px;"></div>
+                    <div class="stroke-dot" data-width="8" style="width: 14px; height: 14px;"></div>
+                    <div class="stroke-dot" data-width="12" style="width: 18px; height: 18px;"></div>
                   </div>
                 </div>
               </div>
               <div class="anno-divider"></div>
+              <button class="anno-btn" id="btnUndo" title="撤销"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></button>
               <button class="anno-btn danger" id="btnClearAnno" title="清除所有"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
               <button class="anno-btn" id="btnCloseToolbar" title="隐藏工具栏"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
@@ -278,8 +297,9 @@
               <button id="btnSave" class="btn primary w-full" title="Ctrl+S">保存</button>
               <button id="btnExport" class="btn w-full" title="导出当前文件">导出</button>
               <button id="btnImport" class="btn w-full" title="导入 .md 文件">导入</button>
-              <button id="btnHelp" class="btn w-full" title="使用说明">帮助</button>
+              <button id="btnExportPDF" class="btn w-full" title="导出为PDF（打印）">导出PDF</button>
             </div>
+            <button id="btnHelp" class="btn w-full mt-1.5" title="使用说明">帮助</button>
           </div>
           <div class="p-3 border-b border-slate-800">
             <div class="section-header">工作区</div>
@@ -367,12 +387,10 @@
 
   <script>
     (() => {
-      // Constants
       const WORKSPACE_KEY = 'reveal_md_workspace_v3';
       const SETTINGS_KEY = 'reveal_md_settings_v3';
       const UI_STATE_KEY = 'reveal_md_ui_state_v2';
 
-      // FIX: Define $ and $$ properly
       const $ = (sel) => document.querySelector(sel);
       const $$ = (sel) => [...document.querySelectorAll(sel)];
       const toastEl = $('#toast');
@@ -481,44 +499,368 @@
       $('#btnExport').onclick = () => { const blob = new Blob([cm.getValue()], { type: 'text/markdown' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); const fname = workspace.activeFileId ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '') : 'slides'; a.href = url; a.download = `${fname}.md`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast('已导出'); };
       $('#btnImport').onclick = () => { $('#fileInput').value = ''; $('#fileInput').click(); };
       $('#fileInput').onchange = (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = () => { const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId: null, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); };
+      
+      // PDF 导出 - 使用 Reveal.js 官方的 print-pdf 模式
+      $('#btnExportPDF').onclick = () => {
+        const md = cm.getValue();
+        const slidesHtml = buildSlidesHtml(md);
+        const theme = settings.theme;
+        const fname = workspace.activeFileId ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '') : 'slides';
+        
+        // 将所有幻灯片展平为单独的页面
+        const groups = splitSlides(md);
+        let flatSlides = [];
+        groups.forEach(group => {
+          group.forEach(slide => {
+            flatSlides.push(renderSlideMarkdown(slide));
+          });
+        });
+        
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) { toast('无法打开窗口'); return; }
+        
+        // 生成每页幻灯片的 HTML
+        const slidePagesHtml = flatSlides.map((content, i) => 
+          `<div class="slide-page"><div class="slide-content">${content}</div><div class="slide-number">${i + 1} / ${flatSlides.length}</div></div>`
+        ).join('');
+        
+        printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${fname} - PDF 导出</title>
+  <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${theme}.css">
+  <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    /* 打印纸张设置 - A4 横向 */
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    /* 每张幻灯片页面 */
+    .slide-page {
+      width: 297mm;
+      height: 210mm;
+      padding: 15mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      page-break-after: always;
+      page-break-inside: avoid;
+      position: relative;
+      background: var(--r-background-color, #191919);
+      color: var(--r-main-color, #fff);
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    
+    .slide-page:last-child {
+      page-break-after: auto;
+    }
+    
+    .slide-content {
+      width: 100%;
+      max-width: 240mm;
+      text-align: center;
+      font-size: 24pt;
+      line-height: 1.4;
+    }
+    
+    .slide-content h1 { font-size: 48pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
+    .slide-content h2 { font-size: 36pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
+    .slide-content h3 { font-size: 28pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
+    .slide-content p { margin-bottom: 0.5em; }
+    .slide-content ul, .slide-content ol { text-align: left; display: inline-block; margin: 0.5em 0; }
+    .slide-content li { margin: 0.3em 0; }
+    .slide-content pre { text-align: left; background: rgba(0,0,0,0.3); padding: 1em; border-radius: 8px; overflow: auto; font-size: 14pt; margin: 0.5em 0; }
+    .slide-content code { font-family: 'Monaco', 'Menlo', monospace; }
+    .slide-content table { margin: 0.5em auto; border-collapse: collapse; }
+    .slide-content th, .slide-content td { border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.8em; }
+    .slide-content img { max-width: 100%; max-height: 150mm; }
+    .slide-content blockquote { border-left: 4px solid var(--r-link-color, #42affa); padding-left: 1em; margin: 0.5em 0; font-style: italic; text-align: left; }
+    
+    .slide-number {
+      position: absolute;
+      bottom: 8mm;
+      right: 10mm;
+      font-size: 10pt;
+      opacity: 0.5;
+    }
+    
+    /* 屏幕预览样式 */
+    @media screen {
+      body {
+        background: #1e293b;
+        padding-bottom: 40px;
+      }
+      
+      .print-header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 1px solid #334155;
+        flex-wrap: wrap;
+      }
+      
+      .print-header h1 {
+        font-size: 18px;
+        color: white;
+        font-weight: 600;
+      }
+      
+      .print-header .info {
+        color: #94a3b8;
+        font-size: 13px;
+      }
+      
+      .print-header .info strong { color: #60a5fa; }
+      
+      .print-header .spacer { flex: 1; }
+      
+      .print-header button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .print-header .btn-print {
+        background: #3b82f6;
+        color: white;
+      }
+      
+      .print-header .btn-print:hover { background: #2563eb; }
+      
+      .print-header .btn-close {
+        background: #475569;
+        color: white;
+      }
+      
+      .print-header .btn-close:hover { background: #64748b; }
+      
+      .slides-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        padding: 24px;
+      }
+      
+      .slide-page {
+        width: 90vw;
+        max-width: 900px;
+        height: auto;
+        aspect-ratio: 297 / 210;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      }
+    }
+    
+    /* 打印时隐藏控制栏 */
+    @media print {
+      .print-header { display: none !important; }
+      .slides-container { padding: 0; gap: 0; }
+      .slide-page {
+        width: 297mm !important;
+        height: 210mm !important;
+        max-width: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-header">
+    <h1>📄 ${fname}</h1>
+    <div class="info">
+      共 <strong>${flatSlides.length}</strong> 页 · 
+      打印设置：<strong>A4 横向</strong>、边距<strong>无</strong>、勾选<strong>背景图形</strong>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn-print" onclick="window.print()">🖨️ 打印 / 保存 PDF</button>
+    <button class="btn-close" onclick="window.close()">✕ 关闭</button>
+  </div>
+  <div class="slides-container">
+    ${slidePagesHtml}
+  </div>
+  <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"><\/script>
+  <script>
+    // 代码高亮
+    if (typeof hljs !== 'undefined') {
+      document.querySelectorAll('pre code').forEach(block => {
+        hljs.highlightElement(block);
+      });
+    }
+  <\/script>
+</body>
+</html>`);
+        printWindow.document.close();
+        toast('PDF 导出窗口已打开');
+      };
 
-      // Annotation
+      // 批注系统
       const canvas = $('#annotationCanvas');
       const ctx = canvas.getContext('2d');
       const toolbar = $('#annotationToolbar');
-      let annoState = { tool: 'pointer', color: '#ef4444', strokeWidth: 3, isDrawing: false, startX: 0, startY: 0, lastX: 0, lastY: 0, paths: [], currentPath: null, toolbarVisible: true };
+      let annoState = { 
+        tool: 'pointer', color: '#ef4444', strokeWidth: 4, 
+        isDrawing: false, startX: 0, startY: 0, lastX: 0, lastY: 0, 
+        currentPath: null, toolbarVisible: true,
+        snapshot: null, history: []
+      };
 
-      function resizeCanvas() { if (!isFullscreen) return; const rect = canvas.parentElement.getBoundingClientRect(); canvas.width = rect.width; canvas.height = rect.height; redrawAnnotations(); }
-      function redrawAnnotations() { ctx.clearRect(0, 0, canvas.width, canvas.height); annoState.paths.forEach(path => { if (path.type === 'pen') drawPath(path); else if (path.type === 'arrow') drawArrow(path.startX, path.startY, path.endX, path.endY, path.color, path.strokeWidth); }); }
-      function drawPath(path) { if (!path.points || path.points.length < 2) return; ctx.beginPath(); ctx.strokeStyle = path.color; ctx.lineWidth = path.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.moveTo(path.points[0].x, path.points[0].y); for (let i=1; i<path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y); ctx.stroke(); }
-      function drawArrow(x1, y1, x2, y2, color, width) { const head = Math.max(width * 4, 15); const angle = Math.atan2(y2 - y1, x2 - x1); ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.beginPath(); ctx.fillStyle = color; ctx.moveTo(x2, y2); ctx.lineTo(x2 - head * Math.cos(angle - Math.PI/6), y2 - head * Math.sin(angle - Math.PI/6)); ctx.lineTo(x2 - head * Math.cos(angle + Math.PI/6), y2 - head * Math.sin(angle + Math.PI/6)); ctx.closePath(); ctx.fill(); }
-      function getPos(e) { const r = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; return { x: cx - r.left, y: cy - r.top }; }
-      function startDraw(e) { if (!isFullscreen || annoState.tool === 'pointer') return; e.preventDefault(); e.stopPropagation(); const p = getPos(e); annoState.isDrawing = true; annoState.startX = p.x; annoState.startY = p.y; annoState.lastX = p.x; annoState.lastY = p.y; if (annoState.tool === 'pen') annoState.currentPath = { type: 'pen', color: annoState.color, strokeWidth: annoState.strokeWidth, points: [{x: p.x, y: p.y}] }; }
-      function draw(e) { if (!isFullscreen || !annoState.isDrawing || annoState.tool === 'pointer') return; e.preventDefault(); e.stopPropagation(); const p = getPos(e); if (annoState.tool === 'pen') { ctx.beginPath(); ctx.strokeStyle = annoState.color; ctx.lineWidth = annoState.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.moveTo(annoState.lastX, annoState.lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); if (annoState.currentPath) annoState.currentPath.points.push({x: p.x, y: p.y}); } else if (annoState.tool === 'arrow') { redrawAnnotations(); drawArrow(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); } else if (annoState.tool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(p.x, p.y, annoState.strokeWidth * 3, 0, Math.PI*2); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; } annoState.lastX = p.x; annoState.lastY = p.y; }
-      function stopDraw(e) { if (!isFullscreen || !annoState.isDrawing) return; const p = e.changedTouches ? { x: e.changedTouches[0].clientX - canvas.getBoundingClientRect().left, y: e.changedTouches[0].clientY - canvas.getBoundingClientRect().top } : (e.clientX!==undefined ? getPos(e) : {x:annoState.lastX, y:annoState.lastY}); if (annoState.tool === 'pen' && annoState.currentPath && annoState.currentPath.points.length>1) annoState.paths.push(annoState.currentPath); else if (annoState.tool === 'arrow') { const dist = Math.hypot(p.x - annoState.startX, p.y - annoState.startY); if (dist>10) annoState.paths.push({ type: 'arrow', color: annoState.color, strokeWidth: annoState.strokeWidth, startX: annoState.startX, startY: annoState.startY, endX: p.x, endY: p.y }); } annoState.isDrawing = false; annoState.currentPath = null; }
+      function resizeCanvas() { 
+        if (!isFullscreen) return; 
+        const rect = canvas.parentElement.getBoundingClientRect(); 
+        canvas.width = rect.width; 
+        canvas.height = rect.height; 
+      }
       
-      canvas.addEventListener('mousedown', startDraw); canvas.addEventListener('mousemove', draw);
-      canvas.addEventListener('mouseup', stopDraw); canvas.addEventListener('mouseleave', stopDraw);
-      canvas.addEventListener('touchstart', startDraw, {passive:false}); canvas.addEventListener('touchmove', draw, {passive:false});
-      canvas.addEventListener('touchend', stopDraw); canvas.addEventListener('touchcancel', stopDraw);
+      function saveSnapshot() { annoState.snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height); }
+      function restoreSnapshot() { if (annoState.snapshot) ctx.putImageData(annoState.snapshot, 0, 0); }
+      function saveToHistory() { annoState.history.push(ctx.getImageData(0, 0, canvas.width, canvas.height)); if (annoState.history.length > 50) annoState.history.shift(); }
+      function undo() { if (annoState.history.length > 0) ctx.putImageData(annoState.history.pop(), 0, 0); }
+      
+      function drawArrow(x1, y1, x2, y2, color, width) { 
+        const head = Math.max(width * 3, 12); 
+        const angle = Math.atan2(y2 - y1, x2 - x1); 
+        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; 
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); 
+        ctx.beginPath(); ctx.fillStyle = color; ctx.moveTo(x2, y2); 
+        ctx.lineTo(x2 - head * Math.cos(angle - Math.PI/6), y2 - head * Math.sin(angle - Math.PI/6)); 
+        ctx.lineTo(x2 - head * Math.cos(angle + Math.PI/6), y2 - head * Math.sin(angle + Math.PI/6)); 
+        ctx.closePath(); ctx.fill(); 
+      }
+      function drawLine(x1, y1, x2, y2, color, width) { ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+      function drawRect(x1, y1, x2, y2, color, width) { ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1)); }
+      function drawEllipse(x1, y1, x2, y2, color, width) { const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2; ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke(); }
+      function getPos(e) { const r = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; return { x: cx - r.left, y: cy - r.top }; }
+      
+      function startDraw(e) { 
+        if (!isFullscreen || annoState.tool === 'pointer') return; 
+        e.preventDefault(); e.stopPropagation(); 
+        const p = getPos(e); 
+        annoState.isDrawing = true; annoState.startX = p.x; annoState.startY = p.y; annoState.lastX = p.x; annoState.lastY = p.y; 
+        if (['line', 'arrow', 'rect', 'ellipse'].includes(annoState.tool)) saveSnapshot();
+        saveToHistory();
+        if (annoState.tool === 'pen' || annoState.tool === 'highlighter') annoState.currentPath = [{ x: p.x, y: p.y }];
+      }
+      
+      function draw(e) { 
+        if (!isFullscreen || !annoState.isDrawing || annoState.tool === 'pointer') return; 
+        e.preventDefault(); e.stopPropagation(); 
+        const p = getPos(e); 
+        
+        if (annoState.tool === 'pen') { 
+          ctx.beginPath(); ctx.strokeStyle = annoState.color; ctx.lineWidth = annoState.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; 
+          ctx.moveTo(annoState.lastX, annoState.lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); 
+          if (annoState.currentPath) annoState.currentPath.push({ x: p.x, y: p.y }); 
+        } else if (annoState.tool === 'highlighter') {
+          ctx.beginPath(); ctx.strokeStyle = annoState.color; ctx.lineWidth = annoState.strokeWidth * 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 0.3;
+          ctx.moveTo(annoState.lastX, annoState.lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.globalAlpha = 1.0;
+          if (annoState.currentPath) annoState.currentPath.push({ x: p.x, y: p.y });
+        } else if (annoState.tool === 'line') { restoreSnapshot(); drawLine(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'arrow') { restoreSnapshot(); drawArrow(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'rect') { restoreSnapshot(); drawRect(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'ellipse') { restoreSnapshot(); drawEllipse(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(p.x, p.y, annoState.strokeWidth * 3, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+        
+        annoState.lastX = p.x; annoState.lastY = p.y; 
+      }
+      
+      function stopDraw(e) { if (!isFullscreen || !annoState.isDrawing) return; annoState.isDrawing = false; annoState.currentPath = null; annoState.snapshot = null; }
+      
+      canvas.addEventListener('mousedown', startDraw); 
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', stopDraw); 
+      canvas.addEventListener('mouseleave', stopDraw);
+      canvas.addEventListener('touchstart', startDraw, { passive: false }); 
+      canvas.addEventListener('touchmove', draw, { passive: false });
+      canvas.addEventListener('touchend', stopDraw); 
+      canvas.addEventListener('touchcancel', stopDraw);
 
-      // Tool buttons - FIX: Use $$ which returns array
-      $$('[data-tool]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); annoState.tool = b.dataset.tool; $$('[data-tool]').forEach(x => x.classList.remove('active')); b.classList.add('active'); if (annoState.tool === 'pointer') canvas.classList.remove('drawing-mode'); else canvas.classList.add('drawing-mode'); }));
+      // 工具按钮 - 修复：使用 $$ 而不是 $
+      $$('[data-tool]').forEach(b => b.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        annoState.tool = b.dataset.tool; 
+        $$('[data-tool]').forEach(x => x.classList.remove('active')); 
+        b.classList.add('active'); 
+        if (annoState.tool === 'pointer') canvas.classList.remove('drawing-mode'); 
+        else canvas.classList.add('drawing-mode'); 
+      }));
+      
       $('#btnAnnoStyle').addEventListener('click', (e) => { e.stopPropagation(); $('#stylePopup').classList.toggle('active'); });
       document.addEventListener('click', (e) => { if (!e.target.closest('#stylePopup') && !e.target.closest('#btnAnnoStyle')) $('#stylePopup').classList.remove('active'); });
-      $$('.color-btn').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); annoState.color = b.dataset.color; $$('.color-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); $('#currentStylePreview').style.backgroundColor = annoState.color; $('#stylePopup').classList.remove('active'); }));
-      $$('.stroke-dot').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); annoState.strokeWidth = parseInt(b.dataset.width); $$('.stroke-dot').forEach(x => x.classList.remove('active')); b.classList.add('active'); $('#stylePopup').classList.remove('active'); }));
-      $('#btnClearAnno').addEventListener('click', (e) => { e.stopPropagation(); annoState.paths = []; ctx.clearRect(0, 0, canvas.width, canvas.height); });
+      
+      // 修复：使用 $$ 而不是 $
+      $$('.color-btn').forEach(b => b.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        annoState.color = b.dataset.color; 
+        $$('.color-btn').forEach(x => x.classList.remove('active')); 
+        b.classList.add('active'); 
+        $('#currentStylePreview').style.backgroundColor = annoState.color; 
+      }));
+      
+      $$('.stroke-dot').forEach(b => b.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        annoState.strokeWidth = parseInt(b.dataset.width); 
+        $$('.stroke-dot').forEach(x => x.classList.remove('active')); 
+        b.classList.add('active'); 
+      }));
+      
+      $('#btnUndo').addEventListener('click', (e) => { e.stopPropagation(); undo(); });
+      $('#btnClearAnno').addEventListener('click', (e) => { e.stopPropagation(); saveToHistory(); ctx.clearRect(0, 0, canvas.width, canvas.height); });
       $('#btnCloseToolbar').addEventListener('click', (e) => { e.stopPropagation(); annoState.toolbarVisible = false; toolbar.classList.remove('visible'); });
       $('#btnToggleAnno').addEventListener('click', (e) => { e.stopPropagation(); annoState.toolbarVisible = !annoState.toolbarVisible; toolbar.classList.toggle('visible', annoState.toolbarVisible); });
 
       async function toggleFullscreen() { const el = $('#previewWrap'); try { if (!document.fullscreenElement) await el.requestFullscreen(); else await document.exitFullscreen(); } catch (_) {} }
-      function onFullscreenChange() { isFullscreen = !!document.fullscreenElement; $('#fsControls').classList.toggle('visible', isFullscreen); toolbar.classList.toggle('visible', isFullscreen && annoState.toolbarVisible); canvas.classList.toggle('fullscreen-active', isFullscreen); if (isFullscreen) { annoState.tool = 'pointer'; $$('[data-tool]').forEach(b => b.classList.remove('active')); $('[data-tool="pointer"]').classList.add('active'); canvas.classList.remove('drawing-mode'); setTimeout(() => { resizeCanvas(); deck && deck.layout(); }, 100); } else { annoState.paths = []; ctx.clearRect(0, 0, canvas.width, canvas.height); $('#stylePopup').classList.remove('active'); } }
+      
+      function onFullscreenChange() { 
+        isFullscreen = !!document.fullscreenElement; 
+        $('#fsControls').classList.toggle('visible', isFullscreen); 
+        toolbar.classList.toggle('visible', isFullscreen && annoState.toolbarVisible); 
+        canvas.classList.toggle('fullscreen-active', isFullscreen); 
+        if (isFullscreen) { 
+          annoState.tool = 'pointer'; 
+          // 修复：使用 $$ 而不是 $
+          $$('[data-tool]').forEach(b => b.classList.remove('active')); 
+          $('[data-tool="pointer"]').classList.add('active'); 
+          canvas.classList.remove('drawing-mode'); 
+          setTimeout(() => { resizeCanvas(); deck && deck.layout(); }, 100); 
+        } else { 
+          annoState.paths = []; 
+          ctx.clearRect(0, 0, canvas.width, canvas.height); 
+          $('#stylePopup').classList.remove('active'); 
+        } 
+      }
+      
       document.addEventListener('fullscreenchange', onFullscreenChange);
       $('#btnFullscreen').onclick = toggleFullscreen;
       $('#btnExitFs').onclick = () => document.exitFullscreen().catch(()=>{});
 
-      // Help Modal - FIX: Proper event handling
+      // Help Modal
       function openHelp() { $('#helpModal').setAttribute('aria-hidden', 'false'); }
       function closeHelp() { $('#helpModal').setAttribute('aria-hidden', 'true'); }
       $('#btnHelp').onclick = openHelp;
