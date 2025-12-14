@@ -20,7 +20,12 @@
     html, body { height: 100%; overflow: hidden; }
     body { margin: 0; overscroll-behavior: none; }
 
+    /* 关键修复：限制 CodeMirror 宽度防止溢出 */
     .CodeMirror { height: 100%; font-size: 14px; line-height: 1.5; }
+    #editor { overflow: hidden; }
+    #editor .CodeMirror { max-width: 100%; }
+    .CodeMirror-scroll { overflow-x: auto !important; }
+    .CodeMirror pre { word-break: break-all; }
 
     /* 关键：禁止浏览器处理触摸滚动 */
     .reveal, .reveal .slides, #previewWrap { touch-action: none !important; }
@@ -53,7 +58,7 @@
     }
 
     #toast {
-      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+      position: fixed; left: 50%; top: 60px; transform: translateX(-50%);
       z-index: 9999; display: none;
       background: rgba(2, 6, 23, 0.95); border: 1px solid rgb(51 65 85);
       color: rgb(226 232 240); padding: 10px 16px; border-radius: 14px;
@@ -64,9 +69,13 @@
     #helpModal[aria-hidden="true"] { display: none; }
     #renameModal[aria-hidden="true"] { display: none; }
 
-    /* Sidebar */
-    .sidebar { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
+    /* Sidebar - 修复移动端溢出 */
+    .sidebar { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; flex-shrink: 0; }
     .sidebar.collapsed { width: 0 !important; min-width: 0 !important; opacity: 0; pointer-events: none; border: none !important; }
+
+    /* 主内容区域 - 防止溢出 */
+    main { overflow: hidden; }
+    #mainContent { overflow: hidden; min-width: 0; }
 
     /* File tree */
     .file-tree-item {
@@ -75,6 +84,7 @@
     }
     .file-tree-item:hover { background: rgb(30 41 59); }
     .file-tree-item.active { background: rgb(37 99 235); color: white; }
+    .file-tree-item.selected { background: rgb(51 65 85); outline: 2px solid rgb(59 130 246); }
     .file-tree-item.folder { font-weight: 500; }
     .file-tree-item .icon { width: 16px; text-align: center; flex-shrink: 0; }
     .file-tree-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -107,6 +117,9 @@
     .toggle-btn.active { background: rgb(37 99 235); border-color: rgb(30 64 175); }
     .divider { width: 1px; height: 20px; background: rgb(51 65 85); margin: 0 4px; }
     .panel.hidden-panel { flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; border: none !important; opacity: 0; pointer-events: none; overflow: hidden; }
+
+    /* 编辑器和预览面板 - 防止溢出 */
+    .panel { min-width: 0; overflow: hidden; }
 
     /* Annotation Canvas */
     #annotationCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; touch-action: none; display: none; pointer-events: none; }
@@ -147,13 +160,21 @@
 
     #fsControls { position: absolute; top: 10px; right: 10px; z-index: 200; display: none; gap: 8px; }
     #fsControls.visible { display: flex; }
+
+    /* 右侧边栏在移动端适配 */
+    @media (max-width: 640px) {
+      #rightSidebar { width: 100% !important; min-width: 0 !important; position: absolute; right: 0; top: 0; bottom: 0; z-index: 50; }
+      #rightSidebar.collapsed { transform: translateX(100%); }
+      #leftSidebar { width: 100% !important; min-width: 0 !important; position: absolute; left: 0; top: 0; bottom: 0; z-index: 50; }
+      #leftSidebar.collapsed { transform: translateX(-100%); }
+    }
   </style>
 </head>
 
 <body class="h-screen bg-slate-950 text-slate-100">
-  <div class="h-screen flex flex-col">
+  <div class="h-screen flex flex-col overflow-hidden">
     <!-- Header -->
-    <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
+    <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/95 backdrop-blur flex-shrink-0">
       <div class="px-2 py-2 flex items-center gap-1.5">
         <button id="btnToggleLeft" class="btn icon-only toggle-btn" title="切换文件栏 (Ctrl+B)">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
@@ -162,7 +183,7 @@
         <div class="flex items-center gap-2 px-2">
           <div class="w-2 h-2 rounded-full bg-blue-500"></div>
           <span class="font-semibold text-sm hidden sm:inline">Reveal.js 编辑器</span>
-          <span class="font-semibold text-sm sm:hidden">📽️</span>
+          <span class="font-semibold text-sm sm:hidden">编辑器</span>
         </div>
         <div class="divider"></div>
         <button id="btnToggleEditor" class="btn sm toggle-btn active" title="显示/隐藏编辑器">
@@ -184,16 +205,16 @@
       </div>
     </header>
 
-    <main class="flex-1 min-h-0 flex">
+    <main class="flex-1 min-h-0 flex relative">
       <!-- Left Sidebar -->
       <aside id="leftSidebar" class="sidebar w-56 min-w-56 border-r border-slate-800 bg-slate-950 flex flex-col">
         <div class="p-2 border-b border-slate-800 flex items-center justify-between">
           <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">工作区</span>
           <div class="flex gap-1">
-            <button id="btnNewFile" class="btn sm icon-only" title="新建文件">
+            <button id="btnNewFile" class="btn sm icon-only" title="新建文件（在选中位置）">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             </button>
-            <button id="btnNewFolder" class="btn sm icon-only" title="新建文件夹">
+            <button id="btnNewFolder" class="btn sm icon-only" title="新建文件夹（在选中位置）">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
             </button>
           </div>
@@ -202,14 +223,18 @@
       </aside>
 
       <!-- Main Content -->
-      <div id="mainContent" class="flex-1 min-h-0 flex flex-col-reverse md:flex-row">
+      <div id="mainContent" class="flex-1 min-h-0 flex flex-col-reverse md:flex-row overflow-hidden">
         <!-- Preview Panel -->
-        <section id="previewPanel" class="panel flex-1 min-h-0 flex flex-col order-first md:order-last">
-          <div class="px-3 py-1.5 border-b md:border-b border-t md:border-t-0 border-slate-800 bg-slate-900/50 flex items-center gap-2">
+        <section id="previewPanel" class="panel flex-1 min-h-0 flex flex-col order-first md:order-last overflow-hidden">
+          <div class="px-3 py-1.5 border-b md:border-b border-t md:border-t-0 border-slate-800 bg-slate-900/50 flex items-center gap-2 flex-shrink-0">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             <span class="text-xs text-slate-300 font-medium">预览</span>
             <span class="text-xs text-slate-500 hidden sm:inline">方向键翻页</span>
-            <div class="ml-auto">
+            <div class="ml-auto flex items-center gap-2">
+              <label class="flex items-center gap-1 text-xs text-slate-400 cursor-pointer" title="编辑时自动同步幻灯片位置">
+                <input type="checkbox" id="settingSyncSlide" class="accent-blue-500" />
+                <span class="hidden sm:inline">同步</span>
+              </label>
               <button id="btnFullscreen" class="btn sm" title="全屏放映">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                 <span>放映</span>
@@ -278,13 +303,13 @@
         </section>
 
         <!-- Editor Panel -->
-        <section id="editorPanel" class="panel flex-1 min-h-0 flex flex-col order-last md:order-first md:border-r border-slate-800">
-          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
+        <section id="editorPanel" class="panel flex-1 min-h-0 flex flex-col order-last md:order-first md:border-r border-slate-800 overflow-hidden">
+          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2 flex-shrink-0">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <span id="currentFileName" class="text-xs text-slate-300 font-medium truncate"></span>
             <div class="ml-auto text-xs text-slate-500">Ctrl+S 保存</div>
           </div>
-          <div class="flex-1 min-h-0" id="editor"></div>
+          <div class="flex-1 min-h-0 overflow-hidden" id="editor"></div>
         </section>
       </div>
 
@@ -299,7 +324,7 @@
               <button id="btnImport" class="btn w-full" title="导入 .md 文件">导入</button>
               <button id="btnExportPDF" class="btn w-full" title="导出为PDF（打印）">导出PDF</button>
             </div>
-            <button id="btnHelp" class="btn w-full mt-1.5" title="使用说明">帮助/关于</button>
+            <button id="btnHelp" class="btn w-full mt-1.5" title="使用说明">帮助</button>
           </div>
           <div class="p-3 border-b border-slate-800">
             <div class="section-header">工作区</div>
@@ -322,6 +347,7 @@
             <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingControls" checked /><span>显示控制按钮</span></label></div>
             <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingProgress" checked /><span>显示进度条</span></label></div>
             <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingSlideNumber" checked /><span>显示页码</span></label></div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingOverflowWarn" checked /><span>内容超出提醒</span></label></div>
           </div>
         </div>
       </aside>
@@ -355,12 +381,32 @@
             <li><strong>橡皮擦</strong>：擦除批注内容</li>
             <li>点击「批注」按钮可显示/隐藏工具栏</li>
           </ul>
+          <div class="section-header mt-4">同步功能</div>
+          <ul class="list-disc pl-5 space-y-1 text-slate-300">
+            <li>勾选预览区的「同步」复选框可在编辑时自动跳转到对应幻灯片</li>
+          </ul>
+          <div class="section-header mt-4">模板功能</div>
+          <ul class="list-disc pl-5 space-y-1 text-slate-300">
+            <li>在任意文件夹中创建名为 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">_template.md</code> 的文件</li>
+            <li>新建文件时会自动使用该模板作为初始内容</li>
+            <li>模板查找顺序：当前文件夹 → 父文件夹 → ... → 根目录</li>
+            <li>如果没有找到模板，新文件内容为空</li>
+          </ul>
+          <div class="section-header mt-4">内容超出提醒</div>
+          <ul class="list-disc pl-5 space-y-1 text-slate-300">
+            <li>当单页内容过多时（行数 &gt; 25、字符数 &gt; 1200、大型代码块、过多列表项），会自动提醒</li>
+            <li>可在右侧设置中关闭此功能</li>
+            <li>建议将内容较多的页面拆分为多个子页面（使用 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">--</code> 分隔）</li>
+          </ul>
           <div class="section-header mt-4">关于此工具</div>
           <ul class="list-disc pl-5 space-y-1 text-slate-300">
-            <li><strong>作者</strong>：由<a href="https://github.com/maoist2009/">maoist2009</a>使用<a href="https://lmarena.ai/">Lmarena</a>上的 claude-opus-4-5-20251101-thinking-32k 制作</li>
-            <li><strong>开源协议</strong>：AGPL-lv3-or-later</li>
+            <li><strong>作者</strong>：由 <a href="https://github.com/maoist2009/" class="text-blue-400 hover:underline">maoist2009</a> 使用 <a href="https://lmarena.ai/" class="text-blue-400 hover:underline">Lmarena</a> 上的 claude-opus-4-5-20251101-thinking-32k 制作</li>
+            <li><strong>开源协议</strong>：AGPL-v3-or-later</li>
             <li><strong>Workers, Unite!</strong></li>
           </ul>
+          <div class="mt-4 p-3 bg-slate-800/50 rounded-lg text-xs text-slate-400">
+            <p>💡 提示：您可以随时点击右侧菜单栏中的「帮助」按钮再次打开此说明。</p>
+          </div>
         </div>
       </div>
     </div>
@@ -407,11 +453,11 @@
 
       const defaultMd = `# Reveal.js 在线编辑器\n\n欢迎使用！\n\n---\n\n## 核心功能\n\n- 📁 左侧：文件夹结构管理\n- ✏️ 中间：Markdown 编辑器\n- ⚙️ 右侧：操作与设置面板\n\n---\n\n## 分隔符语法\n\n- \`---\`：横向分页\n- \`--\`：纵向分页\n\n--\n\n### 这是纵向子页面\n\n\`\`\`javascript\nconsole.log('Hello Reveal.js!')\n\`\`\`\n\n---\n\n## 快捷键\n\n| 功能 | 快捷键 |\n|------|--------|\n| 保存 | Ctrl+S |\n| 全屏放映 | Alt+Enter |\n`;
 
-      let workspace = { files: {}, activeFileId: null, expandedFolders: [] };
-      let settings = { autoSave: true, lineWrap: true, fontSize: 14, theme: 'black', transition: 'slide', controls: true, progress: true, slideNumber: true };
+      let workspace = { files: {}, activeFileId: null, selectedItemId: null, expandedFolders: [] };
+      let settings = { autoSave: true, lineWrap: true, fontSize: 14, theme: 'black', transition: 'slide', controls: true, progress: true, slideNumber: true, syncSlide: false, overflowWarn: true, firstVisit: true };
       let uiState = { leftSidebarOpen: true, rightSidebarOpen: true, editorVisible: true, previewVisible: true };
 
-      try { const s = JSON.parse(localStorage.getItem(WORKSPACE_KEY)); if (s && s.files) workspace = s; } catch (_) {}
+      try { const s = JSON.parse(localStorage.getItem(WORKSPACE_KEY)); if (s && s.files) workspace = { ...workspace, ...s }; } catch (_) {}
       try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) settings = { ...settings, ...s }; } catch (_) {}
       try { const s = JSON.parse(localStorage.getItem(UI_STATE_KEY)); if (s) uiState = { ...uiState, ...s }; } catch (_) {}
 
@@ -431,15 +477,100 @@
       function nowTime() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
       function saveWorkspace() { localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace)); localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); localStorage.setItem(UI_STATE_KEY, JSON.stringify(uiState)); }
       function saveCurrentFile({ silent = false } = {}) { if (!workspace.activeFileId || !workspace.files[workspace.activeFileId]) return; workspace.files[workspace.activeFileId].content = cm.getValue(); saveWorkspace(); setDirty(false); renderStatus(nowTime()); if (!silent) toast('已保存'); }
-      function loadFile(fileId) { if (!workspace.files[fileId] || workspace.files[fileId].type !== 'file') return; if (workspace.activeFileId && workspace.files[workspace.activeFileId]) workspace.files[workspace.activeFileId].content = cm.getValue(); workspace.activeFileId = fileId; const file = workspace.files[fileId]; cm.setValue(file.content || ''); $('#currentFileName').textContent = file.name; setDirty(false); saveWorkspace(); renderFileTree(); requestPreviewUpdate(); }
-      function createFile(name, parentId = null) { const id = generateId(); workspace.files[id] = { name: name || '未命名.md', content: '', parentId, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已创建文件'); }
-      function createFolder(name, parentId = null) { const id = generateId(); workspace.files[id] = { name: name || '新文件夹', parentId, type: 'folder' }; if (!workspace.expandedFolders.includes(id)) workspace.expandedFolders.push(id); saveWorkspace(); renderFileTree(); toast('已创建文件夹'); }
-      function deleteItem(id) { const item = workspace.files[id]; if (!item) return; if (item.type === 'folder') Object.keys(workspace.files).forEach(fid => { if (workspace.files[fid].parentId === id) deleteItem(fid); }); delete workspace.files[id]; if (workspace.activeFileId === id) { const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file'); workspace.activeFileId = files.length > 0 ? files[0][0] : null; if (workspace.activeFileId) loadFile(workspace.activeFileId); else { cm.setValue(''); $('#currentFileName').textContent = ''; } } saveWorkspace(); renderFileTree(); toast('已删除'); }
+      function loadFile(fileId) { if (!workspace.files[fileId] || workspace.files[fileId].type !== 'file') return; if (workspace.activeFileId && workspace.files[workspace.activeFileId]) workspace.files[workspace.activeFileId].content = cm.getValue(); workspace.activeFileId = fileId; workspace.selectedItemId = fileId; const file = workspace.files[fileId]; cm.setValue(file.content || ''); $('#currentFileName').textContent = file.name; setDirty(false); saveWorkspace(); renderFileTree(); requestPreviewUpdate(); }
+      
+      // 获取选中项目的父级ID（用于确定新建文件/文件夹的位置）
+      function getTargetParentId() {
+        if (!workspace.selectedItemId) return null;
+        const selected = workspace.files[workspace.selectedItemId];
+        if (!selected) return null;
+        // 如果选中的是文件夹，则在该文件夹内创建
+        if (selected.type === 'folder') return workspace.selectedItemId;
+        // 如果选中的是文件，则在同级目录创建
+        return selected.parentId;
+      }
+      
+      // 查找模板文件：从指定文件夹向上查找 _template.md
+      function findTemplate(parentId) {
+        let currentParentId = parentId;
+        while (true) {
+          // 在当前目录查找 _template.md
+          const templateFile = Object.entries(workspace.files).find(([_, f]) => 
+            f.type === 'file' && f.name === '_template.md' && f.parentId === currentParentId
+          );
+          if (templateFile) {
+            return templateFile[1].content || '';
+          }
+          // 如果已经是根目录，停止查找
+          if (currentParentId === null) break;
+          // 向上查找父目录
+          const parentFolder = workspace.files[currentParentId];
+          if (!parentFolder) break;
+          currentParentId = parentFolder.parentId;
+        }
+        return ''; // 没找到模板，返回空字符串
+      }
+      
+      function createFile(name, parentId = null) { 
+        const id = generateId(); 
+        const templateContent = findTemplate(parentId);
+        workspace.files[id] = { name: name || '未命名.md', content: templateContent, parentId, type: 'file' }; 
+        saveWorkspace(); 
+        renderFileTree(); 
+        loadFile(id); 
+        toast(templateContent ? '已创建文件（使用模板）' : '已创建文件'); 
+      }
+      function createFolder(name, parentId = null) { const id = generateId(); workspace.files[id] = { name: name || '新文件夹', parentId, type: 'folder' }; if (!workspace.expandedFolders.includes(id)) workspace.expandedFolders.push(id); if (parentId && !workspace.expandedFolders.includes(parentId)) workspace.expandedFolders.push(parentId); workspace.selectedItemId = id; saveWorkspace(); renderFileTree(); toast('已创建文件夹'); }
+      function deleteItem(id) { const item = workspace.files[id]; if (!item) return; if (item.type === 'folder') Object.keys(workspace.files).forEach(fid => { if (workspace.files[fid].parentId === id) deleteItem(fid); }); delete workspace.files[id]; if (workspace.activeFileId === id) { const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file'); workspace.activeFileId = files.length > 0 ? files[0][0] : null; if (workspace.activeFileId) loadFile(workspace.activeFileId); else { cm.setValue(''); $('#currentFileName').textContent = ''; } } if (workspace.selectedItemId === id) workspace.selectedItemId = null; saveWorkspace(); renderFileTree(); toast('已删除'); }
       function renameItem(id, newName) { if (!workspace.files[id]) return; workspace.files[id].name = newName; saveWorkspace(); renderFileTree(); if (workspace.activeFileId === id) $('#currentFileName').textContent = newName; toast('已重命名'); }
       function toggleFolder(id) { const idx = workspace.expandedFolders.indexOf(id); if (idx > -1) workspace.expandedFolders.splice(idx, 1); else workspace.expandedFolders.push(id); saveWorkspace(); renderFileTree(); }
 
-      function renderFileTree() { const container = $('#fileTree'); container.innerHTML = ''; function renderItems(parentId) { const items = Object.entries(workspace.files).filter(([_, item]) => item.parentId === parentId).sort((a, b) => { if (a[1].type !== b[1].type) return a[1].type === 'folder' ? -1 : 1; return a[1].name.localeCompare(b[1].name); }); const fragment = document.createDocumentFragment(); items.forEach(([id, item]) => { const div = document.createElement('div'); div.className = 'file-tree-item' + (item.type === 'folder' ? ' folder' : '') + (workspace.activeFileId === id ? ' active' : ''); div.dataset.id = id; const isExpanded = workspace.expandedFolders.includes(id); div.innerHTML = `<span class="icon">${item.type === 'folder' ? (isExpanded ? '📂' : '📁') : '📄'}</span><span class="name">${item.name}</span><span class="actions"><button data-action="rename" title="重命名">✏️</button><button data-action="delete" title="删除">🗑️</button></span>`; div.addEventListener('click', (e) => { if (e.target.dataset.action) return; if (item.type === 'folder') toggleFolder(id); else loadFile(id); }); div.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, id); }); div.querySelectorAll('[data-action]').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); if (btn.dataset.action === 'rename') openRenameModal(id); else if (btn.dataset.action === 'delete') { if (confirm(`确定删除 "${item.name}"？`)) deleteItem(id); } }); }); fragment.appendChild(div); if (item.type === 'folder') { const children = document.createElement('div'); children.className = 'folder-children' + (isExpanded ? '' : ' collapsed'); const childItems = renderItems(id); if (childItems.childNodes.length > 0) children.appendChild(childItems); fragment.appendChild(children); } }); return fragment; } container.appendChild(renderItems(null)); }
-      function showContextMenu(e, id) { contextMenuTarget = id; const menu = $('#contextMenu'); const item = workspace.files[id]; menu.innerHTML = `${item.type === 'folder' ? `<div class="context-menu-item" data-action="newFile">📄 新建文件</div><div class="context-menu-item" data-action="newFolder">📁 新建文件夹</div>` : ''}<div class="context-menu-item" data-action="rename">✏️ 重命名</div><div class="context-menu-item danger" data-action="delete">🗑️ 删除</div>`; menu.style.display = 'block'; menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px'; menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px'; }
+      function renderFileTree() { 
+        const container = $('#fileTree'); 
+        container.innerHTML = ''; 
+        function renderItems(parentId) { 
+          const items = Object.entries(workspace.files).filter(([_, item]) => item.parentId === parentId).sort((a, b) => { if (a[1].type !== b[1].type) return a[1].type === 'folder' ? -1 : 1; return a[1].name.localeCompare(b[1].name); }); 
+          const fragment = document.createDocumentFragment(); 
+          items.forEach(([id, item]) => { 
+            const div = document.createElement('div'); 
+            const isActive = workspace.activeFileId === id;
+            const isSelected = workspace.selectedItemId === id;
+            div.className = 'file-tree-item' + (item.type === 'folder' ? ' folder' : '') + (isActive ? ' active' : '') + (isSelected && !isActive ? ' selected' : ''); 
+            div.dataset.id = id; 
+            const isExpanded = workspace.expandedFolders.includes(id); 
+            div.innerHTML = `<span class="icon">${item.type === 'folder' ? (isExpanded ? '📂' : '📁') : '📄'}</span><span class="name">${item.name}</span><span class="actions"><button data-action="rename" title="重命名">✏️</button><button data-action="delete" title="删除">🗑️</button></span>`; 
+            div.addEventListener('click', (e) => { 
+              if (e.target.dataset.action) return; 
+              workspace.selectedItemId = id;
+              if (item.type === 'folder') {
+                toggleFolder(id);
+              } else {
+                loadFile(id);
+              }
+              renderFileTree();
+            }); 
+            div.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, id); }); 
+            div.querySelectorAll('[data-action]').forEach(btn => { 
+              btn.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                if (btn.dataset.action === 'rename') openRenameModal(id); 
+                else if (btn.dataset.action === 'delete') { if (confirm(`确定删除 "${item.name}"？`)) deleteItem(id); } 
+              }); 
+            }); 
+            fragment.appendChild(div); 
+            if (item.type === 'folder') { 
+              const children = document.createElement('div'); 
+              children.className = 'folder-children' + (isExpanded ? '' : ' collapsed'); 
+              const childItems = renderItems(id); 
+              if (childItems.childNodes.length > 0) children.appendChild(childItems); 
+              fragment.appendChild(children); 
+            } 
+          }); 
+          return fragment; 
+        } 
+        container.appendChild(renderItems(null)); 
+      }
+      function showContextMenu(e, id) { contextMenuTarget = id; workspace.selectedItemId = id; renderFileTree(); const menu = $('#contextMenu'); const item = workspace.files[id]; menu.innerHTML = `${item.type === 'folder' ? `<div class="context-menu-item" data-action="newFile">📄 新建文件</div><div class="context-menu-item" data-action="newFolder">📁 新建文件夹</div>` : ''}<div class="context-menu-item" data-action="rename">✏️ 重命名</div><div class="context-menu-item danger" data-action="delete">🗑️ 删除</div>`; menu.style.display = 'block'; menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px'; menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px'; }
       document.addEventListener('click', () => $('#contextMenu').style.display = 'none');
       $('#contextMenu').addEventListener('click', (e) => { const action = e.target.dataset.action; if (!action || !contextMenuTarget) return; const item = workspace.files[contextMenuTarget]; if (action === 'rename') openRenameModal(contextMenuTarget); else if (action === 'delete') { if (confirm(`确定删除 "${item.name}"？`)) deleteItem(contextMenuTarget); } else if (action === 'newFile') createFile('未命名.md', contextMenuTarget); else if (action === 'newFolder') createFolder('新文件夹', contextMenuTarget); $('#contextMenu').style.display = 'none'; });
 
@@ -466,7 +597,7 @@
       if (!uiState.previewVisible) $('#previewPanel').classList.add('hidden-panel');
       updateToggleButtons();
 
-      function applySettings() { $('#settingAutoSave').checked = settings.autoSave; $('#settingLineWrap').checked = settings.lineWrap; $('#settingFontSize').value = settings.fontSize; $('#settingTheme').value = settings.theme; $('#settingTransition').value = settings.transition; $('#settingControls').checked = settings.controls; $('#settingProgress').checked = settings.progress; $('#settingSlideNumber').checked = settings.slideNumber; $('#revealTheme').href = `https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${settings.theme}.css`; if (cm) { cm.setOption('lineWrapping', settings.lineWrap); $('.CodeMirror').style.fontSize = settings.fontSize + 'px'; } if (deck) deck.configure({ transition: settings.transition, controls: settings.controls, progress: settings.progress, slideNumber: settings.slideNumber }); }
+      function applySettings() { $('#settingAutoSave').checked = settings.autoSave; $('#settingLineWrap').checked = settings.lineWrap; $('#settingFontSize').value = settings.fontSize; $('#settingTheme').value = settings.theme; $('#settingTransition').value = settings.transition; $('#settingControls').checked = settings.controls; $('#settingProgress').checked = settings.progress; $('#settingSlideNumber').checked = settings.slideNumber; $('#settingSyncSlide').checked = settings.syncSlide; $('#settingOverflowWarn').checked = settings.overflowWarn; $('#revealTheme').href = `https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${settings.theme}.css`; if (cm) { cm.setOption('lineWrapping', settings.lineWrap); $('.CodeMirror').style.fontSize = settings.fontSize + 'px'; } if (deck) deck.configure({ transition: settings.transition, controls: settings.controls, progress: settings.progress, slideNumber: settings.slideNumber }); }
       $('#settingAutoSave').addEventListener('change', (e) => { settings.autoSave = e.target.checked; saveWorkspace(); });
       $('#settingLineWrap').addEventListener('change', (e) => { settings.lineWrap = e.target.checked; cm.setOption('lineWrapping', settings.lineWrap); saveWorkspace(); });
       $('#settingFontSize').addEventListener('change', (e) => { settings.fontSize = parseInt(e.target.value); $('.CodeMirror').style.fontSize = settings.fontSize + 'px'; cm.refresh(); saveWorkspace(); });
@@ -475,45 +606,99 @@
       $('#settingControls').addEventListener('change', (e) => { settings.controls = e.target.checked; if (deck) deck.configure({ controls: settings.controls }); saveWorkspace(); });
       $('#settingProgress').addEventListener('change', (e) => { settings.progress = e.target.checked; if (deck) deck.configure({ progress: settings.progress }); saveWorkspace(); });
       $('#settingSlideNumber').addEventListener('change', (e) => { settings.slideNumber = e.target.checked; if (deck) deck.configure({ slideNumber: settings.slideNumber }); saveWorkspace(); });
+      $('#settingSyncSlide').addEventListener('change', (e) => { settings.syncSlide = e.target.checked; saveWorkspace(); });
+      $('#settingOverflowWarn').addEventListener('change', (e) => { settings.overflowWarn = e.target.checked; saveWorkspace(); });
 
       function splitSlides(md) { const normalized = String(md || '').replace(/\r\n/g, '\n'); const h = normalized.split(/\n\s*---\s*\n/g); return h.map(part => part.split(/\n\s*--\s*\n/g)); }
       function renderSlideMarkdown(mdChunk) { const src = String(mdChunk || '').trim(); if (!src) return '<p style="opacity:0.5">（空白页）</p>'; return marked.parse(src); }
       function buildSlidesHtml(md) { const groups = splitSlides(md); let out = ''; for (const verticalGroup of groups) { if (verticalGroup.length > 1) { out += '<section>'; for (const v of verticalGroup) out += `<section>${renderSlideMarkdown(v)}</section>`; out += '</section>'; } else out += `<section>${renderSlideMarkdown(verticalGroup[0])}</section>`; } return out; }
+      
+      // 根据光标位置计算当前幻灯片索引
+      function getSlideIndexFromCursor() {
+        if (!cm) return { h: 0, v: 0 };
+        const cursor = cm.getCursor();
+        const content = cm.getValue();
+        const lines = content.split('\n');
+        
+        let h = 0, v = 0;
+        let currentLine = 0;
+        
+        for (let i = 0; i < lines.length && currentLine <= cursor.line; i++) {
+          const line = lines[i].trim();
+          if (line === '---' && i > 0) {
+            h++;
+            v = 0;
+          } else if (line === '--' && i > 0) {
+            v++;
+          }
+          currentLine++;
+        }
+        
+        return { h, v };
+      }
+      
       async function ensureDeck() { if (deck) return deck; deck = new Reveal($('#revealRoot'), { embedded: true, hash: false, controls: settings.controls, progress: settings.progress, slideNumber: settings.slideNumber, center: true, transition: settings.transition, backgroundTransition: 'fade', touch: true, touchDistance: 50, navigationMode: 'default', loop: false, plugins: [RevealNotes, RevealHighlight], keyboardCondition: 'focused' }); await deck.initialize(); deck.layout(); return deck; }
       function highlightPreview() { try { if (window.hljs) window.hljs.highlightAll(); } catch (_) {} }
-      const requestPreviewUpdate = debounce(async () => { const md = cm.getValue(); const slidesEl = $('#slides'); const idx = deck ? deck.getIndices() : { h: 0, v: 0, f: 0 }; slidesEl.innerHTML = buildSlidesHtml(md); const d = await ensureDeck(); d.sync(); d.layout(); try { d.slide(idx.h, idx.v, idx.f); } catch (_) {} setTimeout(highlightPreview, 0); if (settings.autoSave) saveCurrentFile({ silent: true }); }, 260);
+      
+      const requestPreviewUpdate = debounce(async () => { 
+        const md = cm.getValue(); 
+        const slidesEl = $('#slides'); 
+        
+        // 如果开启了同步，根据光标位置计算幻灯片索引
+        let idx;
+        if (settings.syncSlide) {
+          idx = getSlideIndexFromCursor();
+        } else {
+          idx = deck ? deck.getIndices() : { h: 0, v: 0, f: 0 };
+        }
+        
+        slidesEl.innerHTML = buildSlidesHtml(md); 
+        const d = await ensureDeck(); 
+        d.sync(); 
+        d.layout(); 
+        try { d.slide(idx.h, idx.v, idx.f || 0); } catch (_) {} 
+        setTimeout(highlightPreview, 0); 
+        if (settings.autoSave) saveCurrentFile({ silent: true });
+        checkSlideOverflow();
+      }, 260);
 
       const initialContent = workspace.activeFileId && workspace.files[workspace.activeFileId] ? workspace.files[workspace.activeFileId].content : '';
-      cm = CodeMirror($('#editor'), { value: initialContent, mode: { name: 'markdown', fencedCodeBlocks: true, strikethrough: true, taskLists: true }, theme: 'material-darker', lineNumbers: true, lineWrapping: settings.lineWrap, indentUnit: 2, tabSize: 2, autofocus: false, extraKeys: { 'Ctrl-S': () => saveCurrentFile(), 'Cmd-S': () => saveCurrentFile(), 'Alt-Enter': () => toggleFullscreen(), 'Ctrl-N': () => createFile(), 'Cmd-N': () => createFile(), 'Ctrl-B': () => toggleLeftSidebar(), 'Cmd-B': () => toggleLeftSidebar() } });
+      cm = CodeMirror($('#editor'), { value: initialContent, mode: { name: 'markdown', fencedCodeBlocks: true, strikethrough: true, taskLists: true }, theme: 'material-darker', lineNumbers: true, lineWrapping: settings.lineWrap, indentUnit: 2, tabSize: 2, autofocus: false, extraKeys: { 'Ctrl-S': () => saveCurrentFile(), 'Cmd-S': () => saveCurrentFile(), 'Alt-Enter': () => toggleFullscreen(), 'Ctrl-N': () => createFile(null, getTargetParentId()), 'Cmd-N': () => createFile(null, getTargetParentId()), 'Ctrl-B': () => toggleLeftSidebar(), 'Cmd-B': () => toggleLeftSidebar() } });
       applySettings();
       if (workspace.activeFileId && workspace.files[workspace.activeFileId]) $('#currentFileName').textContent = workspace.files[workspace.activeFileId].name;
       renderStatus('已加载'); renderFileTree(); $('#slides').innerHTML = buildSlidesHtml(initialContent);
       ensureDeck().then(() => setTimeout(highlightPreview, 0));
       cm.on('change', () => { setDirty(true); requestPreviewUpdate(); });
+      
+      // 光标位置变化时同步幻灯片
+      cm.on('cursorActivity', () => {
+        if (settings.syncSlide && deck) {
+          const idx = getSlideIndexFromCursor();
+          try { deck.slide(idx.h, idx.v, 0); } catch (_) {}
+        }
+      });
 
       $('#btnSave').onclick = () => saveCurrentFile();
       $('#btnToggleLeft').onclick = toggleLeftSidebar;
       $('#btnToggleRight').onclick = toggleRightSidebar;
       $('#btnToggleEditor').onclick = toggleEditor;
       $('#btnTogglePreview').onclick = togglePreview;
-      $('#btnNewFile').onclick = () => createFile();
-      $('#btnNewFolder').onclick = () => createFolder();
+      $('#btnNewFile').onclick = () => createFile(null, getTargetParentId());
+      $('#btnNewFolder').onclick = () => createFolder(null, getTargetParentId());
       $('#btnExportWorkspace').onclick = exportWorkspace;
       $('#btnImportWorkspace').onclick = () => { $('#workspaceInput').value = ''; $('#workspaceInput').click(); };
       $('#workspaceInput').onchange = (e) => { if (e.target.files[0]) importWorkspace(e.target.files[0]); };
-      $('#btnClearWorkspace').onclick = () => { if (!confirm('清空所有？')) return; workspace = { files: {}, activeFileId: null, expandedFolders: [] }; const id = generateId(); workspace.files[id] = { name: '未命名.md', content: '', parentId: null, type: 'file' }; workspace.activeFileId = id; saveWorkspace(); renderFileTree(); loadFile(id); toast('已清空'); };
+      $('#btnClearWorkspace').onclick = () => { if (!confirm('清空所有？')) return; workspace = { files: {}, activeFileId: null, selectedItemId: null, expandedFolders: [] }; const id = generateId(); workspace.files[id] = { name: '未命名.md', content: '', parentId: null, type: 'file' }; workspace.activeFileId = id; saveWorkspace(); renderFileTree(); loadFile(id); toast('已清空'); };
       $('#btnExport').onclick = () => { const blob = new Blob([cm.getValue()], { type: 'text/markdown' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); const fname = workspace.activeFileId ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '') : 'slides'; a.href = url; a.download = `${fname}.md`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast('已导出'); };
       $('#btnImport').onclick = () => { $('#fileInput').value = ''; $('#fileInput').click(); };
-      $('#fileInput').onchange = (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = () => { const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId: null, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); };
+      $('#fileInput').onchange = (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = () => { const parentId = getTargetParentId(); const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); };
       
-      // PDF 导出 - 使用 Reveal.js 官方的 print-pdf 模式
+      // PDF 导出
       $('#btnExportPDF').onclick = () => {
         const md = cm.getValue();
-        const slidesHtml = buildSlidesHtml(md);
         const theme = settings.theme;
         const fname = workspace.activeFileId ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '') : 'slides';
         
-        // 将所有幻灯片展平为单独的页面
         const groups = splitSlides(md);
         let flatSlides = [];
         groups.forEach(group => {
@@ -525,7 +710,6 @@
         const printWindow = window.open('', '_blank');
         if (!printWindow) { toast('无法打开窗口'); return; }
         
-        // 生成每页幻灯片的 HTML
         const slidePagesHtml = flatSlides.map((content, i) => 
           `<div class="slide-page"><div class="slide-content">${content}</div><div class="slide-number">${i + 1} / ${flatSlides.length}</div></div>`
         ).join('');
@@ -539,187 +723,33 @@
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    /* 打印纸张设置 - A4 横向 */
-    @page {
-      size: A4 landscape;
-      margin: 0;
-    }
-    
-    html, body {
-      width: 100%;
-      height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    
-    /* 每张幻灯片页面 */
-    .slide-page {
-      width: 297mm;
-      height: 210mm;
-      padding: 15mm;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      page-break-after: always;
-      page-break-inside: avoid;
-      position: relative;
-      background: var(--r-background-color, #191919);
-      color: var(--r-main-color, #fff);
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      color-adjust: exact !important;
-    }
-    
-    .slide-page:last-child {
-      page-break-after: auto;
-    }
-    
-    .slide-content {
-      width: 100%;
-      max-width: 240mm;
-      text-align: center;
-      font-size: 24pt;
-      line-height: 1.4;
-    }
-    
+    @page { size: A4 landscape; margin: 0; }
+    html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .slide-page { width: 297mm; height: 210mm; padding: 15mm; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; page-break-inside: avoid; position: relative; background: var(--r-background-color, #191919); color: var(--r-main-color, #fff); -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    .slide-page:last-child { page-break-after: auto; }
+    .slide-content { width: 100%; max-width: 240mm; text-align: center; font-size: 24pt; line-height: 1.4; }
     .slide-content h1 { font-size: 48pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
     .slide-content h2 { font-size: 36pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
     .slide-content h3 { font-size: 28pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
-    .slide-content p { margin-bottom: 0.5em; }
-    .slide-content ul, .slide-content ol { text-align: left; display: inline-block; margin: 0.5em 0; }
+    .slide-content p { margin-bottom: 0.5em; font-size: 24pt; }
+    .slide-content ul, .slide-content ol { text-align: left; display: inline-block; margin: 0.5em 0; font-size: 22pt; }
     .slide-content li { margin: 0.3em 0; }
-    .slide-content pre { text-align: left; background: rgba(0,0,0,0.3); padding: 1em; border-radius: 8px; overflow: auto; font-size: 14pt; margin: 0.5em 0; }
-    .slide-content code { font-family: 'Monaco', 'Menlo', monospace; }
-    .slide-content table { margin: 0.5em auto; border-collapse: collapse; }
+    .slide-content pre { text-align: left; background: rgba(0,0,0,0.3); padding: 1em; border-radius: 8px; overflow: auto; font-size: 16pt; margin: 0.5em 0; }
+    .slide-content code { font-family: 'Monaco', 'Menlo', monospace; font-size: 0.9em; }
+    .slide-content table { margin: 0.5em auto; border-collapse: collapse; font-size: 20pt; }
     .slide-content th, .slide-content td { border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.8em; }
-    .slide-content img { max-width: 100%; max-height: 150mm; }
-    .slide-content blockquote { border-left: 4px solid var(--r-link-color, #42affa); padding-left: 1em; margin: 0.5em 0; font-style: italic; text-align: left; }
-    
-    .slide-number {
-      position: absolute;
-      bottom: 8mm;
-      right: 10mm;
-      font-size: 10pt;
-      opacity: 0.5;
-    }
-    
-    /* 屏幕预览样式 */
-    @media screen {
-      body {
-        background: #1e293b;
-        padding-bottom: 40px;
-      }
-      
-      .print-header {
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        padding: 16px 24px;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        border-bottom: 1px solid #334155;
-        flex-wrap: wrap;
-      }
-      
-      .print-header h1 {
-        font-size: 18px;
-        color: white;
-        font-weight: 600;
-      }
-      
-      .print-header .info {
-        color: #94a3b8;
-        font-size: 13px;
-      }
-      
-      .print-header .info strong { color: #60a5fa; }
-      
-      .print-header .spacer { flex: 1; }
-      
-      .print-header button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      
-      .print-header .btn-print {
-        background: #3b82f6;
-        color: white;
-      }
-      
-      .print-header .btn-print:hover { background: #2563eb; }
-      
-      .print-header .btn-close {
-        background: #475569;
-        color: white;
-      }
-      
-      .print-header .btn-close:hover { background: #64748b; }
-      
-      .slides-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 24px;
-        padding: 24px;
-      }
-      
-      .slide-page {
-        width: 90vw;
-        max-width: 900px;
-        height: auto;
-        aspect-ratio: 297 / 210;
-        border-radius: 8px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      }
-    }
-    
-    /* 打印时隐藏控制栏 */
-    @media print {
-      .print-header { display: none !important; }
-      .slides-container { padding: 0; gap: 0; }
-      .slide-page {
-        width: 297mm !important;
-        height: 210mm !important;
-        max-width: none;
-        border-radius: 0;
-        box-shadow: none;
-      }
-    }
+    .slide-content img { max-width: 100%; max-height: 120mm; }
+    .slide-content blockquote { border-left: 4px solid var(--r-link-color, #42affa); padding-left: 1em; margin: 0.5em 0; font-style: italic; text-align: left; font-size: 20pt; }
+    .slide-number { position: absolute; bottom: 8mm; right: 10mm; font-size: 10pt; opacity: 0.5; }
+    @media screen { body { background: #1e293b; padding-bottom: 40px; } .print-header { position: sticky; top: 0; z-index: 100; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 16px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #334155; flex-wrap: wrap; } .print-header h1 { font-size: 18px; color: white; font-weight: 600; } .print-header .info { color: #94a3b8; font-size: 13px; } .print-header .info strong { color: #60a5fa; } .print-header .spacer { flex: 1; } .print-header button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; } .print-header .btn-print { background: #3b82f6; color: white; } .print-header .btn-print:hover { background: #2563eb; } .print-header .btn-close { background: #475569; color: white; } .print-header .btn-close:hover { background: #64748b; } .slides-container { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px; } .slide-page { width: 297mm; height: 210mm; transform: scale(0.35); transform-origin: top center; margin-bottom: -125mm; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); } @media (min-width: 800px) { .slide-page { transform: scale(0.5); margin-bottom: -105mm; } } @media (min-width: 1200px) { .slide-page { transform: scale(0.7); margin-bottom: -63mm; } } }
+    @media print { .print-header { display: none !important; } .slides-container { padding: 0; gap: 0; } .slide-page { width: 297mm !important; height: 210mm !important; max-width: none; border-radius: 0; box-shadow: none; } }
   </style>
 </head>
 <body>
-  <div class="print-header">
-    <h1>📄 ${fname}</h1>
-    <div class="info">
-      共 <strong>${flatSlides.length}</strong> 页 · 
-      打印设置：<strong>A4 横向</strong>、边距<strong>无</strong>、勾选<strong>背景图形</strong>
-    </div>
-    <div class="spacer"></div>
-    <button class="btn-print" onclick="window.print()">🖨️ 打印 / 保存 PDF</button>
-    <button class="btn-close" onclick="window.close()">✕ 关闭</button>
-  </div>
-  <div class="slides-container">
-    ${slidePagesHtml}
-  </div>
+  <div class="print-header"><h1>📄 ${fname}</h1><div class="info">共 <strong>${flatSlides.length}</strong> 页 · 打印设置：<strong>A4 横向</strong>、边距<strong>无</strong>、勾选<strong>背景图形</strong></div><div class="spacer"></div><button class="btn-print" onclick="window.print()">🖨️ 打印 / 保存 PDF</button><button class="btn-close" onclick="window.close()">✕ 关闭</button></div>
+  <div class="slides-container">${slidePagesHtml}</div>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"><\/script>
-  <script>
-    // 代码高亮
-    if (typeof hljs !== 'undefined') {
-      document.querySelectorAll('pre code').forEach(block => {
-        hljs.highlightElement(block);
-      });
-    }
-  <\/script>
+  <script>if (typeof hljs !== 'undefined') { document.querySelectorAll('pre code').forEach(block => { hljs.highlightElement(block); }); }<\/script>
 </body>
 </html>`);
         printWindow.document.close();
@@ -807,7 +837,7 @@
       canvas.addEventListener('touchend', stopDraw); 
       canvas.addEventListener('touchcancel', stopDraw);
 
-      // 工具按钮 - 修复：使用 $$ 而不是 $
+      // 工具按钮
       $$('[data-tool]').forEach(b => b.addEventListener('click', (e) => { 
         e.stopPropagation(); 
         annoState.tool = b.dataset.tool; 
@@ -820,7 +850,6 @@
       $('#btnAnnoStyle').addEventListener('click', (e) => { e.stopPropagation(); $('#stylePopup').classList.toggle('active'); });
       document.addEventListener('click', (e) => { if (!e.target.closest('#stylePopup') && !e.target.closest('#btnAnnoStyle')) $('#stylePopup').classList.remove('active'); });
       
-      // 修复：使用 $$ 而不是 $
       $$('.color-btn').forEach(b => b.addEventListener('click', (e) => { 
         e.stopPropagation(); 
         annoState.color = b.dataset.color; 
@@ -850,7 +879,6 @@
         canvas.classList.toggle('fullscreen-active', isFullscreen); 
         if (isFullscreen) { 
           annoState.tool = 'pointer'; 
-          // 修复：使用 $$ 而不是 $
           $$('[data-tool]').forEach(b => b.classList.remove('active')); 
           $('[data-tool="pointer"]').classList.add('active'); 
           canvas.classList.remove('drawing-mode'); 
@@ -873,10 +901,62 @@
       $('#btnCloseHelp').onclick = closeHelp;
       $('#helpModalBg').onclick = closeHelp;
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeHelp(); closeRenameModal(); } });
+      
+      // 首次访问时自动打开帮助
+      if (settings.firstVisit) {
+        setTimeout(() => {
+          openHelp();
+          settings.firstVisit = false;
+          saveWorkspace();
+        }, 500);
+      }
+      
+      // 内容超出检测 - 基于 Markdown 内容的启发式检测
+      function checkSlideOverflow() {
+        if (!settings.overflowWarn || !deck) return;
+        
+        // 获取当前幻灯片的 Markdown 内容
+        const md = cm.getValue();
+        const idx = getSlideIndexFromCursor();
+        
+        // 分割获取当前幻灯片内容
+        const hSlides = md.split(/\n---\n/);
+        if (idx.h >= hSlides.length) return;
+        
+        const vSlides = hSlides[idx.h].split(/\n--\n/);
+        if (idx.v >= vSlides.length) return;
+        
+        const slideContent = vSlides[idx.v] || '';
+        
+        // 启发式检测 - 更敏感的阈值
+        const lines = slideContent.split('\n');
+        const nonEmptyLines = lines.filter(l => l.trim().length > 0).length;
+        const totalChars = slideContent.length;
+        const hasLargeCodeBlock = /```[\s\S]{300,}```/.test(slideContent);
+        const listItems = (slideContent.match(/^[\s]*[-*+]\s/gm) || []).length;
+        const hasHeading = /^#{1,3}\s/.test(slideContent);
+        
+        // 根据内容类型调整阈值
+        // 如果有标题，可用空间更少
+        const lineThreshold = hasHeading ? 12 : 15;
+        const charThreshold = hasHeading ? 600 : 800;
+        const listThreshold = hasHeading ? 8 : 10;
+        
+        // 检测是否超出
+        let overflow = false;
+        if (nonEmptyLines > lineThreshold) overflow = true;
+        if (totalChars > charThreshold) overflow = true;
+        if (hasLargeCodeBlock) overflow = true;
+        if (listItems > listThreshold) overflow = true;
+        
+        if (overflow) {
+          toast('⚠️ 当前页内容较多，建议使用 -- 拆分为子页面');
+        }
+      }
 
       const editorPanel = $('#editorPanel');
       editorPanel.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-      editorPanel.addEventListener('drop', (e) => { e.preventDefault(); if(e.dataTransfer.files[0]) { const file = e.dataTransfer.files[0]; const reader = new FileReader(); reader.onload = () => { const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId: null, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); } });
+      editorPanel.addEventListener('drop', (e) => { e.preventDefault(); if(e.dataTransfer.files[0]) { const file = e.dataTransfer.files[0]; const reader = new FileReader(); reader.onload = () => { const parentId = getTargetParentId(); const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); } });
       window.addEventListener('beforeunload', (e) => { if(dirty && !settings.autoSave) { e.preventDefault(); e.returnValue = ''; } });
       window.addEventListener('resize', debounce(() => { if(deck) deck.layout(); if(cm) cm.refresh(); if(isFullscreen) resizeCanvas(); }, 120));
       $('#previewWrap').addEventListener('pointerdown', () => $('#previewWrap').focus?.());
