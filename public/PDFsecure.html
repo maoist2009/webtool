@@ -17,6 +17,22 @@
         .log-container {
             font-family: 'Consolas', 'Monaco', monospace;
         }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
@@ -26,7 +42,7 @@
             <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                 PDF ToUnicode 码表置乱工具
             </h1>
-            <p class="text-gray-400">打乱PDF字体映射表，防止文本复制提取 | 纯浏览器端处理</p>
+            <p class="text-gray-400">打乱PDF字体映射表，防止文本复制提取 | 支持随机种子控制</p>
         </div>
 
         <!-- 主面板 -->
@@ -66,14 +82,31 @@
             </div>
 
             <!-- 选项 -->
-            <div class="mt-6 space-y-4">
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" id="removeBookmarks" checked class="w-5 h-5 rounded bg-white/10 border-gray-500 text-blue-500 focus:ring-blue-500">
-                    <label for="removeBookmarks" class="text-gray-300">删除书签（书签包含明文标题）</label>
+            <div class="mt-6 p-4 bg-white/5 rounded-lg space-y-4">
+                <div class="flex flex-wrap gap-6">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="removeBookmarks" checked class="w-5 h-5 rounded bg-white/10 border-gray-500 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                        <label for="removeBookmarks" class="text-gray-300 cursor-pointer select-none">删除书签</label>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="removeMetadata" checked class="w-5 h-5 rounded bg-white/10 border-gray-500 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                        <label for="removeMetadata" class="text-gray-300 cursor-pointer select-none">清除元数据</label>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" id="removeMetadata" checked class="w-5 h-5 rounded bg-white/10 border-gray-500 text-blue-500 focus:ring-blue-500">
-                    <label for="removeMetadata" class="text-gray-300">清除元数据（标题、作者等）</label>
+                
+                <div class="border-t border-white/10 pt-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label class="text-gray-300 whitespace-nowrap text-sm">随机种子 (Seed):</label>
+                        <div class="flex items-center gap-2 flex-1 max-w-md">
+                            <input type="text" id="randomSeed" class="flex-1 bg-black/20 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:border-blue-400 font-mono" placeholder="留空自动生成">
+                            <button id="refreshSeedBtn" class="p-2 text-gray-400 hover:text-blue-400 hover:bg-white/10 rounded transition" title="生成新种子">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <span class="text-xs text-gray-500">相同种子可复现相同的乱码映射</span>
+                    </div>
                 </div>
             </div>
 
@@ -95,8 +128,16 @@
 
             <!-- 日志区域 -->
             <div id="logContainer" class="hidden mt-6">
-                <h3 class="text-gray-300 font-medium mb-2">处理日志</h3>
-                <div id="logArea" class="log-container bg-black/30 rounded-lg p-4 h-48 overflow-y-auto text-sm text-gray-300 space-y-1">
+                <div class="flex justify-between items-end mb-2">
+                    <h3 class="text-gray-300 font-medium">处理日志</h3>
+                    <button id="copyLogBtn" class="flex items-center gap-1.5 px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 text-blue-400 hover:text-blue-300 transition border border-white/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                        </svg>
+                        <span>复制日志</span>
+                    </button>
+                </div>
+                <div id="logArea" class="log-container bg-black/30 rounded-lg p-4 h-48 overflow-y-auto text-sm text-gray-300 space-y-1 border border-white/5">
                 </div>
             </div>
 
@@ -109,7 +150,7 @@
                         </svg>
                         <span class="text-green-300 font-medium">处理完成！</span>
                     </div>
-                    <button id="downloadBtn" class="px-6 py-2 bg-green-500 hover:bg-green-600 rounded-lg font-medium transition">
+                    <button id="downloadBtn" class="px-6 py-2 bg-green-500 hover:bg-green-600 rounded-lg font-medium transition shadow-lg shadow-green-500/30">
                         下载文件
                     </button>
                 </div>
@@ -122,23 +163,22 @@
             <ul class="space-y-2 text-gray-300">
                 <li class="flex items-start gap-2">
                     <span class="text-purple-400">•</span>
-                    <span>查找PDF中所有字体的 ToUnicode CMap 映射表</span>
+                    <span>通过打乱PDF字体 ToUnicode 映射表，使复制的文本变成乱码</span>
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="text-purple-400">•</span>
-                    <span>将字符编码到Unicode的映射关系随机打乱</span>
+                    <span>支持自定义随机种子，相同种子可复现相同的乱码结果</span>
                 </li>
                 <li class="flex items-start gap-2">
                     <span class="text-purple-400">•</span>
-                    <span>删除书签和元数据以防止明文泄露</span>
-                </li>
-                <li class="flex items-start gap-2">
-                    <span class="text-purple-400">•</span>
-                    <span>处理后的PDF视觉效果不变，但复制文本为乱码</span>
+                    <span>自动删除书签和元数据，进一步保护文档隐私</span>
                 </li>
             </ul>
-            <p class="mt-4 text-yellow-400/80 text-sm">
-                ⚠️ 注意：所有处理在浏览器本地完成，文件不会上传到任何服务器
+            <p class="mt-4 text-yellow-400/80 text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                注意：所有处理在浏览器本地完成，文件不会上传到任何服务器
             </p>
         </div>
     </div>
@@ -164,6 +204,65 @@
         const logArea = document.getElementById('logArea');
         const downloadContainer = document.getElementById('downloadContainer');
         const downloadBtn = document.getElementById('downloadBtn');
+        const randomSeedInput = document.getElementById('randomSeed');
+        const refreshSeedBtn = document.getElementById('refreshSeedBtn');
+        const copyLogBtn = document.getElementById('copyLogBtn');
+
+        // 随机数生成器 (Mulberry32)
+        function mulberry32(a) {
+            return function() {
+              var t = a += 0x6D2B79F5;
+              t = Math.imul(t ^ (t >>> 15), t | 1);
+              t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+              return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            }
+        }
+
+        // 种子生成器 (xmur3)
+        function xmur3(str) {
+            for(var i = 0, h = 1779033703 ^ str.length; i < str.length; i++)
+                h = Math.imul(h ^ str.charCodeAt(i), 3432918353),
+                h = h << 13 | h >>> 19;
+            return function() {
+                h = Math.imul(h ^ (h >>> 16), 2246822507);
+                h = Math.imul(h ^ (h >>> 13), 3266489909);
+                return (h ^= h >>> 16) >>> 0;
+            }
+        }
+
+        // 生成随机字符串
+        function generateRandomSeed() {
+            return Math.random().toString(36).substring(2, 10).toUpperCase();
+        }
+
+        // 更新种子输入框
+        refreshSeedBtn.addEventListener('click', () => {
+            randomSeedInput.value = generateRandomSeed();
+            // 闪烁效果提示已更新
+            randomSeedInput.classList.add('bg-blue-500/20');
+            setTimeout(() => randomSeedInput.classList.remove('bg-blue-500/20'), 300);
+        });
+
+        // 复制日志
+        copyLogBtn.addEventListener('click', () => {
+            const text = logArea.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalContent = copyLogBtn.innerHTML;
+                copyLogBtn.innerHTML = `
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span>已复制</span>
+                `;
+                copyLogBtn.classList.add('text-green-400', 'border-green-400/50');
+                setTimeout(() => {
+                    copyLogBtn.innerHTML = originalContent;
+                    copyLogBtn.classList.remove('text-green-400', 'border-green-400/50');
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        });
 
         // 拖放处理
         dropZone.addEventListener('click', () => fileInput.click());
@@ -243,20 +342,21 @@
             progressText.textContent = percent + '%';
         }
 
-        // Fisher-Yates 洗牌算法
-        function shuffle(array) {
+        // Fisher-Yates 洗牌算法 (带自定义随机函数)
+        function shuffle(array, randomFunc) {
             const arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
+                const j = Math.floor(randomFunc() * (i + 1));
                 [arr[i], arr[j]] = [arr[j], arr[i]];
             }
             return arr;
         }
 
         // 生成置乱的 ToUnicode CMap
-        function generateScrambledCMap() {
+        function generateScrambledCMap(randomFunc) {
             const codes = Array.from({ length: 256 }, (_, i) => i);
-            const unis = shuffle(codes);
+            // 使用传入的随机函数进行洗牌
+            const unis = shuffle(codes, randomFunc);
             
             let cmap = `/CIDInit /ProcSet findresource begin
 12 dict begin
@@ -285,7 +385,7 @@ end
         }
 
         // 递归遍历字典查找 ToUnicode
-        function findAndScrambleToUnicode(obj, context, visited = new Set(), depth = 0) {
+        function findAndScrambleToUnicode(obj, context, visited = new Set(), depth = 0, randomFunc) {
             if (depth > 50) return 0; // 防止无限递归
             
             let count = 0;
@@ -317,8 +417,8 @@ end
                                 }
                                 
                                 if (streamObj && typeof streamObj.getContents === 'function') {
-                                    // 生成新的置乱CMap并替换
-                                    const newCmapBytes = generateScrambledCMap();
+                                    // 生成新的置乱CMap并替换，传入随机函数
+                                    const newCmapBytes = generateScrambledCMap(randomFunc);
                                     
                                     // 创建新的流内容
                                     const newStream = context.flateStream(newCmapBytes);
@@ -340,9 +440,9 @@ end
                     for (const [key, value] of entries) {
                         if (value instanceof PDFRef) {
                             const resolved = context.lookup(value);
-                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1);
+                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1, randomFunc);
                         } else {
-                            count += findAndScrambleToUnicode(value, context, visited, depth + 1);
+                            count += findAndScrambleToUnicode(value, context, visited, depth + 1, randomFunc);
                         }
                     }
                 }
@@ -354,9 +454,9 @@ end
                         const item = obj.get(i);
                         if (item instanceof PDFRef) {
                             const resolved = context.lookup(item);
-                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1);
+                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1, randomFunc);
                         } else {
-                            count += findAndScrambleToUnicode(item, context, visited, depth + 1);
+                            count += findAndScrambleToUnicode(item, context, visited, depth + 1, randomFunc);
                         }
                     }
                 }
@@ -378,6 +478,20 @@ end
             logArea.innerHTML = '';
             
             try {
+                // 处理随机种子
+                let seed = randomSeedInput.value.trim();
+                if (!seed) {
+                    seed = generateRandomSeed();
+                    randomSeedInput.value = seed;
+                    log(`自动生成随机种子: ${seed}`, 'info');
+                } else {
+                    log(`使用指定随机种子: ${seed}`, 'info');
+                }
+                
+                // 初始化 PRNG
+                const seedFunc = xmur3(seed);
+                const randomFunc = mulberry32(seedFunc());
+                
                 log('开始读取PDF文件...');
                 setProgress(10);
                 
@@ -443,7 +557,8 @@ end
                             const fonts = resourcesObj.get(PDFName.of('Font'));
                             if (fonts) {
                                 const fontsObj = fonts instanceof PDFRef ? context.lookup(fonts) : fonts;
-                                scrambledCount += findAndScrambleToUnicode(fontsObj, context, new Set(), 0);
+                                // 传递 randomFunc
+                                scrambledCount += findAndScrambleToUnicode(fontsObj, context, new Set(), 0, randomFunc);
                             }
                         }
                     }
@@ -475,11 +590,14 @@ end
         function downloadPDF() {
             if (!processedPdfBytes) return;
             
+            const seed = randomSeedInput.value.trim() || 'random';
             const blob = new Blob([processedPdfBytes], { type: 'application/pdf' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = selectedFile.name.replace('.pdf', '_scrambled.pdf');
+            // 文件名加上种子信息以便识别
+            const baseName = selectedFile.name.replace(/\.pdf$/i, '');
+            a.download = `${baseName}_scrambled_${seed}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
