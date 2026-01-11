@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF ToUnicode 码表置乱工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <style>
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+        .drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .log-container {
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 标题 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                PDF ToUnicode 码表置乱工具
+            </h1>
+            <p class="text-gray-400">打乱PDF字体映射表，防止文本复制提取 | 纯浏览器端处理</p>
+        </div>
+
+        <!-- 主面板 -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-white/20">
+            <!-- 上传区域 -->
+            <div id="dropZone" class="drop-zone border-2 border-dashed border-gray-500 rounded-xl p-12 text-center cursor-pointer hover:border-blue-400 hover:bg-white/5">
+                <div class="flex flex-col items-center gap-4">
+                    <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <div>
+                        <p class="text-xl font-medium text-gray-300">拖放PDF文件到此处</p>
+                        <p class="text-gray-500 mt-1">或点击选择文件</p>
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf" class="hidden">
+            </div>
+
+            <!-- 文件信息 -->
+            <div id="fileInfo" class="hidden mt-6 p-4 bg-white/5 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                        </svg>
+                        <div>
+                            <p id="fileName" class="font-medium"></p>
+                            <p id="fileSize" class="text-sm text-gray-400"></p>
+                        </div>
+                    </div>
+                    <button id="removeFile" class="text-gray-400 hover:text-red-400 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 选项 -->
+            <div class="mt-6 space-y-4">
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="removeBookmarks" checked class="w-5 h-5 rounded bg-white/10 border-gray-500 text-blue-500 focus:ring-blue-500">
+                    <label for="removeBookmarks" class="text-gray-300">删除书签（书签包含明文标题）</label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="removeMetadata" checked class="w-5 h-5 rounded bg-white/10 border-gray-500 text-blue-500 focus:ring-blue-500">
+                    <label for="removeMetadata" class="text-gray-300">清除元数据（标题、作者等）</label>
+                </div>
+            </div>
+
+            <!-- 处理按钮 -->
+            <button id="processBtn" disabled class="mt-6 w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+                开始处理
+            </button>
+
+            <!-- 进度条 -->
+            <div id="progressContainer" class="hidden mt-6">
+                <div class="flex justify-between text-sm text-gray-400 mb-2">
+                    <span>处理进度</span>
+                    <span id="progressText">0%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                    <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 日志区域 -->
+            <div id="logContainer" class="hidden mt-6">
+                <h3 class="text-gray-300 font-medium mb-2">处理日志</h3>
+                <div id="logArea" class="log-container bg-black/30 rounded-lg p-4 h-48 overflow-y-auto text-sm text-gray-300 space-y-1">
+                </div>
+            </div>
+
+            <!-- 下载区域 -->
+            <div id="downloadContainer" class="hidden mt-6 p-4 bg-green-500/20 rounded-lg border border-green-500/30">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-green-300 font-medium">处理完成！</span>
+                    </div>
+                    <button id="downloadBtn" class="px-6 py-2 bg-green-500 hover:bg-green-600 rounded-lg font-medium transition">
+                        下载文件
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 说明 -->
+        <div class="mt-8 bg-white/5 backdrop-blur rounded-xl p-6 border border-white/10">
+            <h2 class="text-xl font-bold mb-4 text-blue-400">工作原理</h2>
+            <ul class="space-y-2 text-gray-300">
+                <li class="flex items-start gap-2">
+                    <span class="text-purple-400">•</span>
+                    <span>查找PDF中所有字体的 ToUnicode CMap 映射表</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-purple-400">•</span>
+                    <span>将字符编码到Unicode的映射关系随机打乱</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-purple-400">•</span>
+                    <span>删除书签和元数据以防止明文泄露</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-purple-400">•</span>
+                    <span>处理后的PDF视觉效果不变，但复制文本为乱码</span>
+                </li>
+            </ul>
+            <p class="mt-4 text-yellow-400/80 text-sm">
+                ⚠️ 注意：所有处理在浏览器本地完成，文件不会上传到任何服务器
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const { PDFDocument, PDFName, PDFDict, PDFStream, PDFRawStream, PDFRef, PDFArray } = PDFLib;
+        
+        let selectedFile = null;
+        let processedPdfBytes = null;
+
+        // DOM 元素
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFileBtn = document.getElementById('removeFile');
+        const processBtn = document.getElementById('processBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const logContainer = document.getElementById('logContainer');
+        const logArea = document.getElementById('logArea');
+        const downloadContainer = document.getElementById('downloadContainer');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // 拖放处理
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        removeFileBtn.addEventListener('click', resetUI);
+
+        function handleFile(file) {
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatSize(file.size);
+            fileInfo.classList.remove('hidden');
+            processBtn.disabled = false;
+            downloadContainer.classList.add('hidden');
+            logArea.innerHTML = '';
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function resetUI() {
+            selectedFile = null;
+            processedPdfBytes = null;
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            processBtn.disabled = true;
+            progressContainer.classList.add('hidden');
+            logContainer.classList.add('hidden');
+            downloadContainer.classList.add('hidden');
+            logArea.innerHTML = '';
+            setProgress(0);
+        }
+
+        function log(message, type = 'info') {
+            const colors = {
+                info: 'text-gray-300',
+                success: 'text-green-400',
+                warning: 'text-yellow-400',
+                error: 'text-red-400'
+            };
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = colors[type] || colors.info;
+            div.textContent = `[${time}] ${message}`;
+            logArea.appendChild(div);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function setProgress(percent) {
+            progressBar.style.width = percent + '%';
+            progressText.textContent = percent + '%';
+        }
+
+        // Fisher-Yates 洗牌算法
+        function shuffle(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        // 生成置乱的 ToUnicode CMap
+        function generateScrambledCMap() {
+            const codes = Array.from({ length: 256 }, (_, i) => i);
+            const unis = shuffle(codes);
+            
+            let cmap = `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+256 beginbfchar
+`;
+            for (let i = 0; i < 256; i++) {
+                const cid = i.toString(16).padStart(2, '0').toUpperCase();
+                const uni = unis[i].toString(16).padStart(4, '0').toUpperCase();
+                cmap += `<${cid}> <${uni}>\n`;
+            }
+            
+            cmap += `endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`;
+            return new TextEncoder().encode(cmap);
+        }
+
+        // 递归遍历字典查找 ToUnicode
+        function findAndScrambleToUnicode(obj, context, visited = new Set(), depth = 0) {
+            if (depth > 50) return 0; // 防止无限递归
+            
+            let count = 0;
+            
+            if (!obj || typeof obj !== 'object') return count;
+            
+            // 避免循环引用
+            const objId = obj.toString?.() || String(obj);
+            if (visited.has(objId)) return count;
+            visited.add(objId);
+            
+            try {
+                // 检查是否是字体字典
+                if (obj instanceof PDFDict) {
+                    const type = obj.get(PDFName.of('Type'));
+                    const subtype = obj.get(PDFName.of('Subtype'));
+                    
+                    const isFont = (type && type.toString() === '/Font') || 
+                                   (subtype && ['/Type0', '/Type1', '/TrueType', '/CIDFontType0', '/CIDFontType2'].includes(subtype.toString()));
+                    
+                    if (isFont) {
+                        const toUnicode = obj.get(PDFName.of('ToUnicode'));
+                        if (toUnicode) {
+                            try {
+                                // 获取流对象
+                                let streamObj = toUnicode;
+                                if (toUnicode instanceof PDFRef) {
+                                    streamObj = context.lookup(toUnicode);
+                                }
+                                
+                                if (streamObj && typeof streamObj.getContents === 'function') {
+                                    // 生成新的置乱CMap并替换
+                                    const newCmapBytes = generateScrambledCMap();
+                                    
+                                    // 创建新的流内容
+                                    const newStream = context.flateStream(newCmapBytes);
+                                    
+                                    // 替换引用
+                                    if (toUnicode instanceof PDFRef) {
+                                        context.assign(toUnicode, newStream);
+                                    }
+                                    count++;
+                                }
+                            } catch (e) {
+                                // 忽略单个流处理错误
+                            }
+                        }
+                    }
+                    
+                    // 递归处理字典中的值
+                    const entries = obj.entries?.() || [];
+                    for (const [key, value] of entries) {
+                        if (value instanceof PDFRef) {
+                            const resolved = context.lookup(value);
+                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1);
+                        } else {
+                            count += findAndScrambleToUnicode(value, context, visited, depth + 1);
+                        }
+                    }
+                }
+                
+                // 处理数组
+                if (obj instanceof PDFArray) {
+                    const size = obj.size?.() || 0;
+                    for (let i = 0; i < size; i++) {
+                        const item = obj.get(i);
+                        if (item instanceof PDFRef) {
+                            const resolved = context.lookup(item);
+                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1);
+                        } else {
+                            count += findAndScrambleToUnicode(item, context, visited, depth + 1);
+                        }
+                    }
+                }
+            } catch (e) {
+                // 忽略处理错误
+            }
+            
+            return count;
+        }
+
+        // 处理PDF
+        async function processPDF() {
+            if (!selectedFile) return;
+            
+            processBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+            logContainer.classList.remove('hidden');
+            downloadContainer.classList.add('hidden');
+            logArea.innerHTML = '';
+            
+            try {
+                log('开始读取PDF文件...');
+                setProgress(10);
+                
+                const arrayBuffer = await selectedFile.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer, { 
+                    ignoreEncryption: true,
+                    updateMetadata: false 
+                });
+                
+                log(`PDF加载成功，共 ${pdfDoc.getPageCount()} 页`);
+                setProgress(20);
+                
+                const context = pdfDoc.context;
+                
+                // 删除书签
+                if (document.getElementById('removeBookmarks').checked) {
+                    log('正在删除书签...');
+                    try {
+                        const catalog = pdfDoc.catalog;
+                        if (catalog.has(PDFName.of('Outlines'))) {
+                            catalog.delete(PDFName.of('Outlines'));
+                            log('书签已删除', 'success');
+                        } else {
+                            log('未发现书签', 'info');
+                        }
+                    } catch (e) {
+                        log('删除书签时出错: ' + e.message, 'warning');
+                    }
+                }
+                setProgress(30);
+                
+                // 清除元数据
+                if (document.getElementById('removeMetadata').checked) {
+                    log('正在清除元数据...');
+                    try {
+                        pdfDoc.setTitle('');
+                        pdfDoc.setAuthor('');
+                        pdfDoc.setSubject('');
+                        pdfDoc.setKeywords([]);
+                        pdfDoc.setProducer('');
+                        pdfDoc.setCreator('');
+                        log('元数据已清除', 'success');
+                    } catch (e) {
+                        log('清除元数据时出错: ' + e.message, 'warning');
+                    }
+                }
+                setProgress(40);
+                
+                // 查找并置乱 ToUnicode
+                log('正在查找并置乱ToUnicode映射表...');
+                
+                let scrambledCount = 0;
+                const pages = pdfDoc.getPages();
+                
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const resources = page.node.get(PDFName.of('Resources'));
+                    
+                    if (resources) {
+                        const resourcesObj = resources instanceof PDFRef ? context.lookup(resources) : resources;
+                        
+                        if (resourcesObj instanceof PDFDict) {
+                            const fonts = resourcesObj.get(PDFName.of('Font'));
+                            if (fonts) {
+                                const fontsObj = fonts instanceof PDFRef ? context.lookup(fonts) : fonts;
+                                scrambledCount += findAndScrambleToUnicode(fontsObj, context, new Set(), 0);
+                            }
+                        }
+                    }
+                    
+                    setProgress(40 + Math.floor((i + 1) / pages.length * 40));
+                }
+                
+                log(`已置乱 ${scrambledCount} 个ToUnicode映射表`, scrambledCount > 0 ? 'success' : 'warning');
+                setProgress(85);
+                
+                // 保存PDF
+                log('正在生成新的PDF文件...');
+                processedPdfBytes = await pdfDoc.save();
+                
+                setProgress(100);
+                log(`处理完成！输出文件大小: ${formatSize(processedPdfBytes.length)}`, 'success');
+                
+                downloadContainer.classList.remove('hidden');
+                
+            } catch (error) {
+                log('处理失败: ' + error.message, 'error');
+                console.error(error);
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        // 下载处理后的PDF
+        function downloadPDF() {
+            if (!processedPdfBytes) return;
+            
+            const blob = new Blob([processedPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = selectedFile.name.replace('.pdf', '_scrambled.pdf');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        processBtn.addEventListener('click', processPDF);
+        downloadBtn.addEventListener('click', downloadPDF);
+    </script>
+</body>
+</html>
