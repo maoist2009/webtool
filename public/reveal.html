@@ -2,251 +2,190 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Reveal.js 在线 Markdown 编辑器</title>
 
   <script src="https://gcore.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
-  <!-- Reveal.js (gcore.jsdelivr) -->
+  <!-- Reveal.js -->
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css">
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/black.css" id="revealTheme">
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css">
 
-  <!-- CodeMirror (gcore.jsdelivr) -->
+  <!-- CodeMirror -->
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/theme/material-darker.min.css">
 
   <style>
-    html, body { height: 100%; }
-    body { margin: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { margin: 0; overscroll-behavior: none; }
 
-    .CodeMirror {
-      height: 100%;
-      font-size: 14px;
-      line-height: 1.5;
-    }
+    /* 关键修复：限制 CodeMirror 宽度防止溢出 */
+    .CodeMirror { height: 100%; font-size: 14px; line-height: 1.5; }
+    #editor { overflow: hidden; }
+    #editor .CodeMirror { max-width: 100%; }
+    .CodeMirror-scroll { overflow-x: auto !important; }
+    .CodeMirror pre { word-break: break-all; }
+
+    /* 关键：禁止浏览器处理触摸滚动 */
+    .reveal, .reveal .slides, #previewWrap { touch-action: none !important; }
 
     #previewWrap { position: relative; }
     #previewWrap .reveal { height: 100%; width: 100%; }
 
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: .4rem;
-      padding: .45rem .7rem;
-      border-radius: .5rem;
-      background: rgb(30 41 59);
-      border: 1px solid rgb(51 65 85);
-      color: rgb(226 232 240);
-      font-size: 0.8rem;
-      user-select: none;
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .5rem .75rem; border-radius: .75rem;
+      background: color-mix(in oklab, rgb(30 41 59) 85%, transparent);
+      border: 1px solid rgb(51 65 85); color: rgb(226 232 240);
+      font-size: 0.875rem; user-select: none; transition: all 0.2s; cursor: pointer;
     }
     .btn:hover { background: rgb(51 65 85); }
-    .btn:active { transform: scale(0.97); }
+    .btn:active { transform: translateY(1px); }
     .btn.primary { background: rgb(37 99 235); border-color: rgb(30 64 175); }
     .btn.primary:hover { background: rgb(29 78 216); }
-    .btn.danger { background: rgb(127 29 29); border-color: rgb(153 27 27); }
+    .btn.danger { background: rgb(185 28 28); border-color: rgb(127 29 29); }
     .btn.danger:hover { background: rgb(153 27 27); }
+    .btn.icon-only { padding: .5rem; justify-content: center; }
+    .btn.active { background: rgb(37 99 235); border-color: rgb(30 64 175); color: white; }
     .btn.sm { padding: .3rem .5rem; font-size: 0.75rem; }
-    .btn.icon-only { padding: .4rem; }
-    .btn.ghost { background: transparent; border-color: transparent; }
-    .btn.ghost:hover { background: rgb(51 65 85); }
 
     .chip {
-      border: 1px solid rgb(51 65 85);
-      background: rgb(15 23 42);
-      color: rgb(148 163 184);
-      border-radius: 9999px;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.7rem;
-      display: inline-flex;
-      align-items: center;
-      gap: .35rem;
-      white-space: nowrap;
+      border: 1px solid rgb(51 65 85); background: rgb(15 23 42);
+      color: rgb(148 163 184); border-radius: 9999px;
+      padding: 0.25rem 0.6rem; font-size: 0.75rem;
+      display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap;
     }
 
     #toast {
-      position: fixed;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      z-index: 60;
-      display: none;
-      background: rgba(2, 6, 23, 0.95);
-      border: 1px solid rgb(51 65 85);
-      color: rgb(226 232 240);
-      padding: 10px 16px;
-      border-radius: 10px;
-      box-shadow: 0 12px 30px rgba(0,0,0,.4);
-      max-width: min(680px, calc(100vw - 24px));
-      font-size: 0.875rem;
+      position: fixed; left: 50%; top: 60px; transform: translateX(-50%);
+      z-index: 9999; display: none;
+      background: rgba(2, 6, 23, 0.95); border: 1px solid rgb(51 65 85);
+      color: rgb(226 232 240); padding: 10px 16px; border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.4); font-size: 0.875rem;
     }
 
+    /* Modal */
     #helpModal[aria-hidden="true"] { display: none; }
+    #renameModal[aria-hidden="true"] { display: none; }
 
-    /* Sidebar styles */
-    .sidebar {
-      transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s;
-      overflow: hidden;
-    }
-    .sidebar.collapsed {
-      width: 0 !important;
-      min-width: 0 !important;
-      border: none !important;
-      opacity: 0;
-      pointer-events: none;
-    }
+    /* Sidebar - 修复移动端溢出 */
+    .sidebar { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; flex-shrink: 0; }
+    .sidebar.collapsed { width: 0 !important; min-width: 0 !important; opacity: 0; pointer-events: none; border: none !important; }
 
-    /* Panel styles */
-    .panel {
-      transition: flex 0.25s ease, width 0.25s ease, opacity 0.2s;
-      overflow: hidden;
-    }
-    .panel.hidden-panel {
-      flex: 0 0 0 !important;
-      width: 0 !important;
-      min-width: 0 !important;
-      border: none !important;
-      opacity: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
+    /* 主内容区域 - 防止溢出 */
+    main { overflow: hidden; }
+    #mainContent { overflow: hidden; min-width: 0; }
 
     /* File tree */
     .file-tree-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: background 0.15s;
+      display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+      border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.15s;
     }
     .file-tree-item:hover { background: rgb(30 41 59); }
     .file-tree-item.active { background: rgb(37 99 235); color: white; }
+    .file-tree-item.selected { background: rgb(51 65 85); outline: 2px solid rgb(59 130 246); }
     .file-tree-item.folder { font-weight: 500; }
     .file-tree-item .icon { width: 16px; text-align: center; flex-shrink: 0; }
     .file-tree-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .file-tree-item .actions { display: none; gap: 2px; }
     .file-tree-item:hover .actions { display: flex; }
-    .file-tree-item .actions button {
-      background: transparent;
-      border: none;
-      color: rgb(148 163 184);
-      cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 4px;
-      font-size: 11px;
-    }
+    .file-tree-item .actions button { background: transparent; border: none; color: rgb(148 163 184); cursor: pointer; padding: 2px 4px; border-radius: 4px; font-size: 11px; }
     .file-tree-item .actions button:hover { background: rgb(51 65 85); color: white; }
-
-    .folder-children {
-      margin-left: 14px;
-      border-left: 1px solid rgb(51 65 85);
-      padding-left: 6px;
-    }
+    .folder-children { margin-left: 14px; border-left: 1px solid rgb(51 65 85); padding-left: 6px; }
     .folder-children.collapsed { display: none; }
 
-    /* Settings panel */
+    /* Settings */
     .setting-group { margin-bottom: 12px; }
-    .setting-group label {
-      display: block;
-      font-size: 12px;
-      color: rgb(148 163 184);
-      margin-bottom: 4px;
+    .setting-group label { display: block; font-size: 12px; color: rgb(148 163 184); margin-bottom: 4px; }
+    .setting-group select, .setting-group input[type="text"], .setting-group input[type="number"] {
+      width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid rgb(51 65 85);
+      background: rgb(15 23 42); color: rgb(226 232 240); font-size: 13px;
     }
-    .setting-group select,
-    .setting-group input[type="text"],
-    .setting-group input[type="number"] {
-      width: 100%;
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid rgb(51 65 85);
-      background: rgb(15 23 42);
-      color: rgb(226 232 240);
-      font-size: 13px;
-    }
-    .setting-group input[type="checkbox"] {
-      accent-color: rgb(37 99 235);
-    }
+    .setting-group input[type="checkbox"] { accent-color: rgb(37 99 235); }
 
     /* Context menu */
     .context-menu {
-      position: fixed;
-      background: rgb(15 23 42);
-      border: 1px solid rgb(51 65 85);
-      border-radius: 8px;
-      padding: 4px;
-      z-index: 100;
-      min-width: 140px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      position: fixed; background: rgb(15 23 42); border: 1px solid rgb(51 65 85);
+      border-radius: 8px; padding: 4px; z-index: 100; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
     }
-    .context-menu-item {
-      padding: 8px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .context-menu-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 8px; }
     .context-menu-item:hover { background: rgb(30 41 59); }
     .context-menu-item.danger { color: rgb(248 113 113); }
 
-    /* Section header */
-    .section-header {
-      font-size: 11px;
-      font-weight: 600;
-      color: rgb(100 116 139);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid rgb(51 65 85);
+    .section-header { font-size: 11px; font-weight: 600; color: rgb(100 116 139); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgb(51 65 85); }
+    .toggle-btn.active { background: rgb(37 99 235); border-color: rgb(30 64 175); }
+    .divider { width: 1px; height: 20px; background: rgb(51 65 85); margin: 0 4px; }
+    .panel.hidden-panel { flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; border: none !important; opacity: 0; pointer-events: none; overflow: hidden; }
+
+    /* 编辑器和预览面板 - 防止溢出 */
+    .panel { min-width: 0; overflow: hidden; }
+
+    /* Annotation Canvas */
+    #annotationCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; touch-action: none; display: none; pointer-events: none; }
+    #annotationCanvas.fullscreen-active { display: block; }
+    #annotationCanvas.drawing-mode { pointer-events: auto; }
+
+    /* Annotation Toolbar */
+    #annotationToolbar { position: absolute; z-index: 200; display: none; background: rgba(15, 23, 42, 0.95); border: 1px solid rgb(51 65 85); border-radius: 12px; padding: 8px; gap: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.6); backdrop-filter: blur(8px); }
+    #annotationToolbar.visible { display: flex; }
+
+    /* 竖屏: 左侧垂直 */
+    @media (orientation: portrait) {
+      #annotationToolbar { left: 10px; top: 50%; transform: translateY(-50%); flex-direction: column; align-items: center; }
+      .anno-popup { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 10px; }
+      .anno-divider { width: 24px; height: 1px; margin: 4px 0; }
+    }
+    /* 横屏: 底部水平 */
+    @media (orientation: landscape) {
+      #annotationToolbar { bottom: 20px; left: 50%; transform: translateX(-50%); flex-direction: row; align-items: center; }
+      .anno-popup { bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px; }
+      .anno-divider { width: 1px; height: 24px; margin: 0 4px; }
     }
 
-    /* Toolbar toggle button active state */
-    .toggle-btn.active {
-      background: rgb(37 99 235);
-      border-color: rgb(30 64 175);
-    }
+    .anno-btn { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: transparent; color: rgb(148 163 184); border: 1px solid transparent; cursor: pointer; flex-shrink: 0; }
+    .anno-btn:hover { background: rgb(30 41 59); color: white; }
+    .anno-btn.active { background: rgb(37 99 235); color: white; border-color: rgb(30 64 175); }
+    .anno-btn.danger:hover { background: rgb(185 28 28); color: white; }
+    .anno-divider { background: rgb(51 65 85); }
 
-    /* Divider */
-    .divider {
-      width: 1px;
-      height: 20px;
-      background: rgb(51 65 85);
-      margin: 0 4px;
+    .anno-popup { position: absolute; background: rgba(15, 23, 42, 0.95); border: 1px solid rgb(51 65 85); border-radius: 12px; padding: 8px; display: none; gap: 8px; flex-wrap: wrap; width: max-content; max-width: 160px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .anno-popup.active { display: grid; grid-template-columns: repeat(5, 1fr); }
+    .color-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgb(51 65 85); cursor: pointer; }
+    .color-btn.active { border-color: white; box-shadow: 0 0 0 2px rgb(37 99 235); }
+    .width-btn { grid-column: span 5; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgb(51 65 85); }
+    .stroke-dot { background: rgb(148 163 184); border-radius: 50%; cursor: pointer; }
+    .stroke-dot:hover { background: white; }
+    .stroke-dot.active { background: rgb(37 99 235); box-shadow: 0 0 0 2px rgba(37 99 235, 0.3); }
+
+    #fsControls { position: absolute; top: 10px; right: 10px; z-index: 200; display: none; gap: 8px; }
+    #fsControls.visible { display: flex; }
+
+    /* 右侧边栏在移动端适配 */
+    @media (max-width: 640px) {
+      #rightSidebar { width: 100% !important; min-width: 0 !important; position: absolute; right: 0; top: 0; bottom: 0; z-index: 50; }
+      #rightSidebar.collapsed { transform: translateX(100%); }
+      #leftSidebar { width: 100% !important; min-width: 0 !important; position: absolute; left: 0; top: 0; bottom: 0; z-index: 50; }
+      #leftSidebar.collapsed { transform: translateX(-100%); }
     }
   </style>
 </head>
 
 <body class="h-screen bg-slate-950 text-slate-100">
-  <div class="h-screen flex flex-col">
-    <!-- Compact Header / Toolbar -->
-    <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
+  <div class="h-screen flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/95 backdrop-blur flex-shrink-0">
       <div class="px-2 py-2 flex items-center gap-1.5">
-        <!-- Left toggle -->
         <button id="btnToggleLeft" class="btn icon-only toggle-btn" title="切换文件栏 (Ctrl+B)">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
         </button>
-
         <div class="divider"></div>
-
-        <!-- Logo -->
         <div class="flex items-center gap-2 px-2">
           <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-          <span class="font-semibold text-sm">Reveal.js 编辑器</span>
+          <span class="font-semibold text-sm hidden sm:inline">Reveal.js 编辑器</span>
+          <span class="font-semibold text-sm sm:hidden">编辑器</span>
         </div>
-
         <div class="divider"></div>
-
-        <!-- View toggles -->
         <button id="btnToggleEditor" class="btn sm toggle-btn active" title="显示/隐藏编辑器">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span class="hidden sm:inline">编辑</span>
@@ -255,34 +194,27 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <span class="hidden sm:inline">预览</span>
         </button>
-
         <div class="flex-1"></div>
-
-        <!-- Status -->
-        <div id="status" class="chip" aria-live="polite">已保存</div>
-
+        <div id="status" class="chip text-xs" aria-live="polite">已保存</div>
         <div class="divider"></div>
-
-        <!-- Right toggle -->
         <button id="btnToggleRight" class="btn icon-only toggle-btn" title="切换菜单栏">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-
         <input id="fileInput" type="file" accept=".md,.markdown,.txt" class="hidden" />
         <input id="workspaceInput" type="file" accept=".json" class="hidden" />
       </div>
     </header>
 
-    <main class="flex-1 min-h-0 flex">
-      <!-- Left Sidebar - File Tree -->
+    <main class="flex-1 min-h-0 flex relative">
+      <!-- Left Sidebar -->
       <aside id="leftSidebar" class="sidebar w-56 min-w-56 border-r border-slate-800 bg-slate-950 flex flex-col">
         <div class="p-2 border-b border-slate-800 flex items-center justify-between">
           <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">工作区</span>
           <div class="flex gap-1">
-            <button id="btnNewFile" class="btn sm icon-only" title="新建文件 (Ctrl+N)">
+            <button id="btnNewFile" class="btn sm icon-only" title="新建文件（在选中位置）">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             </button>
-            <button id="btnNewFolder" class="btn sm icon-only" title="新建文件夹">
+            <button id="btnNewFolder" class="btn sm icon-only" title="新建文件夹（在选中位置）">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
             </button>
           </div>
@@ -290,230 +222,190 @@
         <div id="fileTree" class="flex-1 overflow-auto p-2"></div>
       </aside>
 
-      <!-- Main Content Area -->
-      <div id="mainContent" class="flex-1 min-h-0 flex flex-col md:flex-row">
-        <!-- Editor Panel -->
-        <section id="editorPanel" class="panel flex-1 min-h-0 flex flex-col border-b md:border-b-0 md:border-r border-slate-800">
-          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span id="currentFileName" class="text-xs text-slate-300 font-medium truncate"></span>
-            <div class="ml-auto text-xs text-slate-500">Ctrl+S 保存</div>
-          </div>
-          <div class="flex-1 min-h-0" id="editor"></div>
-        </section>
-
+      <!-- Main Content -->
+      <div id="mainContent" class="flex-1 min-h-0 flex flex-col-reverse md:flex-row overflow-hidden">
         <!-- Preview Panel -->
-        <section id="previewPanel" class="panel flex-1 min-h-0 flex flex-col">
-          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2">
+        <section id="previewPanel" class="panel flex-1 min-h-0 flex flex-col order-first md:order-last overflow-hidden">
+          <div class="px-3 py-1.5 border-b md:border-b border-t md:border-t-0 border-slate-800 bg-slate-900/50 flex items-center gap-2 flex-shrink-0">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             <span class="text-xs text-slate-300 font-medium">预览</span>
-            <span class="text-xs text-slate-500">方向键翻页</span>
-            <div class="ml-auto flex items-center gap-1">
-              <button id="btnFullscreen" class="btn sm" title="全屏放映 (Alt+Enter)">
+            <span class="text-xs text-slate-500 hidden sm:inline">方向键翻页</span>
+            <div class="ml-auto flex items-center gap-2">
+              <label class="flex items-center gap-1 text-xs text-slate-400 cursor-pointer" title="编辑时自动同步幻灯片位置">
+                <input type="checkbox" id="settingSyncSlide" class="accent-blue-500" />
+                <span class="hidden sm:inline">同步</span>
+              </label>
+              <button id="btnFullscreen" class="btn sm" title="全屏放映">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                 <span>放映</span>
               </button>
             </div>
           </div>
-          <div id="previewWrap" class="flex-1 min-h-0 overflow-hidden bg-black">
+          <div id="previewWrap" class="flex-1 min-h-0 overflow-hidden bg-black relative">
             <div id="revealRoot" class="reveal">
               <div id="slides" class="slides"></div>
             </div>
+            <canvas id="annotationCanvas"></canvas>
+            <div id="fsControls">
+              <button id="btnToggleAnno" class="btn sm" title="批注工具">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+                <span class="hidden sm:inline ml-1">批注</span>
+              </button>
+              <button id="btnExitFs" class="btn sm" title="退出全屏">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              </button>
+            </div>
+            <div id="annotationToolbar">
+              <!-- 指针 -->
+              <button class="anno-btn active" data-tool="pointer" title="指针（操作幻灯片）"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg></button>
+              <!-- 画笔 -->
+              <button class="anno-btn" data-tool="pen" title="画笔"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg></button>
+              <!-- 荧光笔 -->
+              <button class="anno-btn" data-tool="highlighter" title="荧光笔"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l-6 6v3h9l3-3"/><path d="M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+              <!-- 直线 -->
+              <button class="anno-btn" data-tool="line" title="直线"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5"/></svg></button>
+              <!-- 矩形 -->
+              <button class="anno-btn" data-tool="rect" title="矩形"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></button>
+              <!-- 椭圆 -->
+              <button class="anno-btn" data-tool="ellipse" title="椭圆"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
+              <!-- 箭头 -->
+              <button class="anno-btn" data-tool="arrow" title="箭头"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+              <!-- 橡皮擦 -->
+              <button class="anno-btn" data-tool="eraser" title="橡皮擦"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1L13.1 3.8c.6-.6 1.5-.6 2.1 0L21 9.5c.6.6.6 1.5 0 2.1L12 20"/></svg></button>
+              <div class="anno-divider"></div>
+              <div class="relative">
+                <button class="anno-btn" id="btnAnnoStyle" title="样式设置"><div id="currentStylePreview" style="width: 16px; height: 16px; border-radius: 50%; background: #ef4444; border: 2px solid currentColor;"></div></button>
+                <div id="stylePopup" class="anno-popup">
+                  <div class="color-btn active" data-color="#ef4444" style="background: #ef4444"></div>
+                  <div class="color-btn" data-color="#3b82f6" style="background: #3b82f6"></div>
+                  <div class="color-btn" data-color="#22c55e" style="background: #22c55e"></div>
+                  <div class="color-btn" data-color="#eab308" style="background: #eab308"></div>
+                  <div class="color-btn" data-color="#ffffff" style="background: #ffffff"></div>
+                  <div class="color-btn" data-color="#f97316" style="background: #f97316"></div>
+                  <div class="color-btn" data-color="#a855f7" style="background: #a855f7"></div>
+                  <div class="color-btn" data-color="#06b6d4" style="background: #06b6d4"></div>
+                  <div class="color-btn" data-color="#ec4899" style="background: #ec4899"></div>
+                  <div class="color-btn" data-color="#000000" style="background: #000000; border-color: #666;"></div>
+                  <div class="width-btn">
+                    <div class="stroke-dot" data-width="2" style="width: 6px; height: 6px;"></div>
+                    <div class="stroke-dot active" data-width="4" style="width: 10px; height: 10px;"></div>
+                    <div class="stroke-dot" data-width="8" style="width: 14px; height: 14px;"></div>
+                    <div class="stroke-dot" data-width="12" style="width: 18px; height: 18px;"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="anno-divider"></div>
+              <button class="anno-btn" id="btnUndo" title="撤销"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></button>
+              <button class="anno-btn danger" id="btnClearAnno" title="清除所有"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+              <button class="anno-btn" id="btnCloseToolbar" title="隐藏工具栏"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
           </div>
+        </section>
+
+        <!-- Editor Panel -->
+        <section id="editorPanel" class="panel flex-1 min-h-0 flex flex-col order-last md:order-first md:border-r border-slate-800 overflow-hidden">
+          <div class="px-3 py-1.5 border-b border-slate-800 bg-slate-900/50 flex items-center gap-2 flex-shrink-0">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-slate-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="currentFileName" class="text-xs text-slate-300 font-medium truncate"></span>
+            <div class="ml-auto text-xs text-slate-500">Ctrl+S 保存</div>
+          </div>
+          <div class="flex-1 min-h-0 overflow-hidden" id="editor"></div>
         </section>
       </div>
 
-      <!-- Right Sidebar - Menu & Settings -->
+      <!-- Right Sidebar -->
       <aside id="rightSidebar" class="sidebar w-64 min-w-64 border-l border-slate-800 bg-slate-950 flex flex-col">
         <div class="flex-1 overflow-auto">
-          <!-- Actions Section -->
           <div class="p-3 border-b border-slate-800">
             <div class="section-header">文件操作</div>
             <div class="grid grid-cols-2 gap-1.5">
-              <button id="btnSave" class="btn primary w-full" title="Ctrl+S">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                保存
-              </button>
-              <button id="btnExport" class="btn w-full" title="导出当前文件">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                导出
-              </button>
-              <button id="btnImport" class="btn w-full" title="导入 .md 文件">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                导入
-              </button>
-              <button id="btnHelp" class="btn w-full" title="使用说明">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                帮助
-              </button>
+              <button id="btnSave" class="btn primary w-full" title="Ctrl+S">保存</button>
+              <button id="btnExport" class="btn w-full" title="导出当前文件">导出</button>
+              <button id="btnImport" class="btn w-full" title="导入 .md 文件">导入</button>
+              <button id="btnExportPDF" class="btn w-full" title="导出为PDF（打印）">导出PDF</button>
             </div>
+            <button id="btnHelp" class="btn w-full mt-1.5" title="使用说明">帮助</button>
           </div>
-
-          <!-- Workspace Section -->
           <div class="p-3 border-b border-slate-800">
             <div class="section-header">工作区</div>
             <div class="grid grid-cols-2 gap-1.5">
-              <button id="btnExportWorkspace" class="btn w-full text-xs" title="导出所有文件">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                导出全部
-              </button>
-              <button id="btnImportWorkspace" class="btn w-full text-xs" title="导入工作区">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                导入全部
-              </button>
+              <button id="btnExportWorkspace" class="btn w-full text-xs" title="导出所有文件">导出全部</button>
+              <button id="btnImportWorkspace" class="btn w-full text-xs" title="导入工作区">导入全部</button>
             </div>
-            <button id="btnClearWorkspace" class="btn danger w-full mt-2 text-xs">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              清空工作区
-            </button>
+            <button id="btnClearWorkspace" class="btn danger w-full mt-2 text-xs">清空工作区</button>
           </div>
-
-          <!-- Editor Settings -->
           <div class="p-3 border-b border-slate-800">
             <div class="section-header">编辑器设置</div>
-            <div class="setting-group">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="settingAutoSave" checked />
-                <span>自动保存</span>
-              </label>
-            </div>
-            <div class="setting-group">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="settingLineWrap" checked />
-                <span>自动换行</span>
-              </label>
-            </div>
-            <div class="setting-group">
-              <label>字体大小</label>
-              <select id="settingFontSize">
-                <option value="12">12px</option>
-                <option value="14" selected>14px</option>
-                <option value="16">16px</option>
-                <option value="18">18px</option>
-              </select>
-            </div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingAutoSave" checked /><span>自动保存</span></label></div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingLineWrap" checked /><span>自动换行</span></label></div>
+            <div class="setting-group"><label>字体大小</label><select id="settingFontSize"><option value="12">12px</option><option value="14" selected>14px</option><option value="16">16px</option><option value="18">18px</option></select></div>
           </div>
-
-          <!-- Reveal Settings -->
           <div class="p-3 border-b border-slate-800">
             <div class="section-header">演示文稿</div>
-            <div class="setting-group">
-              <label>主题</label>
-              <select id="settingTheme">
-                <option value="black">Black</option>
-                <option value="white">White</option>
-                <option value="league">League</option>
-                <option value="beige">Beige</option>
-                <option value="sky">Sky</option>
-                <option value="night">Night</option>
-                <option value="serif">Serif</option>
-                <option value="simple">Simple</option>
-                <option value="solarized">Solarized</option>
-                <option value="moon">Moon</option>
-                <option value="dracula">Dracula</option>
-              </select>
-            </div>
-            <div class="setting-group">
-              <label>切换效果</label>
-              <select id="settingTransition">
-                <option value="none">无</option>
-                <option value="fade">淡入淡出</option>
-                <option value="slide" selected>滑动</option>
-                <option value="convex">凸出</option>
-                <option value="concave">凹入</option>
-                <option value="zoom">缩放</option>
-              </select>
-            </div>
-            <div class="setting-group">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="settingControls" checked />
-                <span>显示控制按钮</span>
-              </label>
-            </div>
-            <div class="setting-group">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="settingProgress" checked />
-                <span>显示进度条</span>
-              </label>
-            </div>
-            <div class="setting-group">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="settingSlideNumber" checked />
-                <span>显示页码</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Shortcuts -->
-          <div class="p-3">
-            <div class="section-header">快捷键</div>
-            <div class="text-xs text-slate-400 space-y-1">
-              <div class="flex justify-between"><span>保存</span><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded">Ctrl+S</span></div>
-              <div class="flex justify-between"><span>全屏放映</span><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded">Alt+Enter</span></div>
-              <div class="flex justify-between"><span>新建文件</span><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded">Ctrl+N</span></div>
-              <div class="flex justify-between"><span>切换文件栏</span><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded">Ctrl+B</span></div>
-            </div>
+            <div class="setting-group"><label>主题</label><select id="settingTheme"><option value="black">Black</option><option value="white">White</option><option value="league">League</option><option value="beige">Beige</option><option value="sky">Sky</option><option value="night">Night</option><option value="serif">Serif</option><option value="simple">Simple</option><option value="solarized">Solarized</option><option value="moon">Moon</option><option value="dracula">Dracula</option></select></div>
+            <div class="setting-group"><label>切换效果</label><select id="settingTransition"><option value="none">无</option><option value="fade">淡入淡出</option><option value="slide" selected>滑动</option><option value="convex">凸出</option><option value="concave">凹入</option><option value="zoom">缩放</option></select></div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingControls" checked /><span>显示控制按钮</span></label></div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingProgress" checked /><span>显示进度条</span></label></div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingSlideNumber" checked /><span>显示页码</span></label></div>
+            <div class="setting-group"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="settingOverflowWarn" checked /><span>内容超出提醒</span></label></div>
           </div>
         </div>
       </aside>
     </main>
   </div>
 
-  <!-- Toast -->
   <div id="toast"></div>
-
-  <!-- Context Menu -->
   <div id="contextMenu" class="context-menu" style="display: none;"></div>
 
   <!-- Help Modal -->
   <div id="helpModal" aria-hidden="true" class="fixed inset-0 z-50">
-    <div class="absolute inset-0 bg-black/70" data-close="true"></div>
+    <div class="absolute inset-0 bg-black/70" id="helpModalBg"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4">
       <div class="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
         <div class="p-4 border-b border-slate-800 flex items-center gap-2">
           <div class="font-semibold">使用说明</div>
-          <button class="ml-auto btn sm" data-close="true" type="button">关闭</button>
+          <button class="ml-auto btn sm" id="btnCloseHelp" type="button">关闭</button>
         </div>
         <div class="p-4 space-y-3 text-sm text-slate-200 max-h-[70vh] overflow-auto">
           <div class="text-slate-300">这是一个基于 <span class="font-semibold text-blue-400">Markdown → Reveal.js</span> 的在线幻灯片编辑器。</div>
-          
           <div class="section-header mt-4">幻灯片分隔</div>
           <ul class="list-disc pl-5 space-y-1 text-slate-300">
             <li><code class="bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">---</code>：横向分页（下一张）</li>
             <li><code class="bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">--</code>：纵向分页（下钻）</li>
           </ul>
-
-          <div class="section-header mt-4">界面布局</div>
+          <div class="section-header mt-4">批注画板（放映模式）</div>
           <ul class="list-disc pl-5 space-y-1 text-slate-300">
-            <li>顶部工具栏可切换编辑器/预览的显示</li>
-            <li>左侧边栏：文件夹结构管理</li>
-            <li>右侧边栏：操作按钮和设置</li>
-            <li>所有边栏都可以折叠隐藏</li>
+            <li><strong>指针模式</strong>：默认模式，可正常操作幻灯片翻页</li>
+            <li><strong>画笔</strong>：自由绘制，支持多种颜色和粗细</li>
+            <li><strong>箭头</strong>：绘制箭头指示</li>
+            <li><strong>橡皮擦</strong>：擦除批注内容</li>
+            <li>点击「批注」按钮可显示/隐藏工具栏</li>
           </ul>
-
-          <div class="section-header mt-4">文件管理</div>
+          <div class="section-header mt-4">同步功能</div>
           <ul class="list-disc pl-5 space-y-1 text-slate-300">
-            <li>左侧边栏支持创建文件和文件夹</li>
-            <li>右键文件/文件夹可重命名或删除</li>
-            <li>支持导入/导出单个文件或整个工作区</li>
-            <li>支持拖拽 .md 文件到编辑区导入</li>
+            <li>勾选预览区的「同步」复选框可在编辑时自动跳转到对应幻灯片</li>
           </ul>
-
-          <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-3 mt-4">
-            <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">示例</div>
-            <pre class="text-xs text-slate-200 overflow-auto"><code># 第一张幻灯片
-
----
-
-## 第二张（横向）
-
---
-
-### 第二张的子页面（纵向）
-
-```js
-console.log('代码高亮')
-```</code></pre>
+          <div class="section-header mt-4">模板功能</div>
+          <ul class="list-disc pl-5 space-y-1 text-slate-300">
+            <li>在任意文件夹中创建名为 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">_template.md</code> 的文件</li>
+            <li>新建文件时会自动使用该模板作为初始内容</li>
+            <li>模板查找顺序：当前文件夹 → 父文件夹 → ... → 根目录</li>
+            <li>如果没有找到模板，新文件内容为空</li>
+          </ul>
+          <div class="section-header mt-4">内容超出提醒</div>
+          <ul class="list-disc pl-5 space-y-1 text-slate-300">
+            <li>当单页内容过多时（行数 &gt; 25、字符数 &gt; 1200、大型代码块、过多列表项），会自动提醒</li>
+            <li>可在右侧设置中关闭此功能</li>
+            <li>建议将内容较多的页面拆分为多个子页面（使用 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-blue-300">--</code> 分隔）</li>
+          </ul>
+          <div class="section-header mt-4">关于此工具</div>
+          <ul class="list-disc pl-5 space-y-1 text-slate-300">
+            <li><strong>作者</strong>：由 <a href="https://github.com/maoist2009/" class="text-blue-400 hover:underline">maoist2009</a> 使用 <a href="https://lmarena.ai/" class="text-blue-400 hover:underline">Lmarena</a> 上的 claude-opus-4-5-20251101-thinking-32k 制作</li>
+            <li><strong>开源协议</strong>：AGPL-v3-or-later</li>
+            <li><strong>Workers, Unite!</strong></li>
+          </ul>
+          <div class="mt-4 p-3 bg-slate-800/50 rounded-lg text-xs text-slate-400">
+            <p>💡 提示：您可以随时点击右侧菜单栏中的「帮助」按钮再次打开此说明。</p>
           </div>
         </div>
       </div>
@@ -521,35 +413,26 @@ console.log('代码高亮')
   </div>
 
   <!-- Rename Modal -->
-  <div id="renameModal" aria-hidden="true" class="fixed inset-0 z-50" style="display: none;">
-    <div class="absolute inset-0 bg-black/70" data-close="true"></div>
+  <div id="renameModal" aria-hidden="true" class="fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/70" id="renameModalBg"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4">
       <div class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
-        <div class="p-4 border-b border-slate-800">
-          <div class="font-semibold" id="renameModalTitle">重命名</div>
-        </div>
-        <div class="p-4">
-          <input type="text" id="renameInput" class="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-white focus:outline-none focus:border-blue-500" />
-        </div>
+        <div class="p-4 border-b border-slate-800"><div class="font-semibold" id="renameModalTitle">重命名</div></div>
+        <div class="p-4"><input type="text" id="renameInput" class="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-white focus:outline-none focus:border-blue-500" /></div>
         <div class="p-4 border-t border-slate-800 flex justify-end gap-2">
-          <button class="btn" data-close="true">取消</button>
+          <button class="btn" id="btnCancelRename">取消</button>
           <button id="renameConfirm" class="btn primary">确定</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Dependencies (gcore.jsdelivr) -->
+  <!-- Dependencies -->
   <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
-  <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/meta.min.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/markdown/markdown.min.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/xml/xml.min.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/javascript/javascript.min.js"></script>
-  <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/css/css.min.js"></script>
-  <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
-
   <script src="https://gcore.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/notes/notes.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"></script>
@@ -561,878 +444,523 @@ console.log('代码高亮')
       const UI_STATE_KEY = 'reveal_md_ui_state_v2';
 
       const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => [...document.querySelectorAll(sel)];
       const toastEl = $('#toast');
 
-      function toast(msg) {
-        toastEl.textContent = msg;
-        toastEl.style.display = 'block';
-        clearTimeout(toastEl.__t);
-        toastEl.__t = setTimeout(() => (toastEl.style.display = 'none'), 2000);
-      }
+      function toast(msg) { toastEl.textContent = msg; toastEl.style.display = 'block'; clearTimeout(toastEl.__t); toastEl.__t = setTimeout(() => (toastEl.style.display = 'none'), 2000); }
+      function debounce(fn, wait) { let t = null; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
+      function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
 
-      function debounce(fn, wait) {
-        let t = null;
-        return (...args) => {
-          clearTimeout(t);
-          t = setTimeout(() => fn(...args), wait);
-        };
-      }
+      const defaultMd = `# Reveal.js 在线编辑器\n\n欢迎使用！\n\n---\n\n## 核心功能\n\n- 📁 左侧：文件夹结构管理\n- ✏️ 中间：Markdown 编辑器\n- ⚙️ 右侧：操作与设置面板\n\n---\n\n## 分隔符语法\n\n- \`---\`：横向分页\n- \`--\`：纵向分页\n\n--\n\n### 这是纵向子页面\n\n\`\`\`javascript\nconsole.log('Hello Reveal.js!')\n\`\`\`\n\n---\n\n## 快捷键\n\n| 功能 | 快捷键 |\n|------|--------|\n| 保存 | Ctrl+S |\n| 全屏放映 | Alt+Enter |\n`;
 
-      function generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-      }
+      let workspace = { files: {}, activeFileId: null, selectedItemId: null, expandedFolders: [] };
+      let settings = { autoSave: true, lineWrap: true, fontSize: 14, theme: 'black', transition: 'slide', controls: true, progress: true, slideNumber: true, syncSlide: false, overflowWarn: true, firstVisit: true };
+      let uiState = { leftSidebarOpen: true, rightSidebarOpen: true, editorVisible: true, previewVisible: true };
 
-      const defaultMd = `# Reveal.js 在线编辑器
+      try { const s = JSON.parse(localStorage.getItem(WORKSPACE_KEY)); if (s && s.files) workspace = { ...workspace, ...s }; } catch (_) {}
+      try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) settings = { ...settings, ...s }; } catch (_) {}
+      try { const s = JSON.parse(localStorage.getItem(UI_STATE_KEY)); if (s) uiState = { ...uiState, ...s }; } catch (_) {}
 
-欢迎使用！这是一个功能完整的 Markdown 幻灯片编辑器。
-
----
-
-## 核心功能
-
-- 📁 左侧：文件夹结构管理
-- ✏️ 中间：Markdown 编辑器
-- ⚙️ 右侧：操作与设置面板
-- 🎬 顶部：视图切换控制
-
----
-
-## 分隔符语法
-
-- \`---\`：横向分页（下一张）
-- \`--\`：纵向分页（下钻子页面）
-
---
-
-### 这是纵向子页面
-
-\`\`\`javascript
-// 支持代码高亮
-console.log('Hello Reveal.js!')
-\`\`\`
-
----
-
-## 快捷键
-
-| 功能 | 快捷键 |
-|------|--------|
-| 保存 | Ctrl+S |
-| 全屏放映 | Alt+Enter |
-| 新建文件 | Ctrl+N |
-| 切换文件栏 | Ctrl+B |
-
----
-
-## 开始使用
-
-1. 在左侧创建或选择文件
-2. 在编辑器中书写 Markdown
-3. 右侧预览实时更新
-4. 点击「放映」进入全屏演示`;
-
-      // Workspace structure
-      let workspace = {
-        files: {},
-        activeFileId: null,
-        expandedFolders: []
-      };
-
-      let settings = {
-        autoSave: true,
-        lineWrap: true,
-        fontSize: 14,
-        theme: 'black',
-        transition: 'slide',
-        controls: true,
-        progress: true,
-        slideNumber: true
-      };
-
-      let uiState = {
-        leftSidebarOpen: true,
-        rightSidebarOpen: true,
-        editorVisible: true,
-        previewVisible: true
-      };
-
-      // Load saved data
-      try {
-        const savedWorkspace = JSON.parse(localStorage.getItem(WORKSPACE_KEY));
-        if (savedWorkspace && savedWorkspace.files) workspace = savedWorkspace;
-      } catch (_) {}
-
-      try {
-        const savedSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-        if (savedSettings) settings = { ...settings, ...savedSettings };
-      } catch (_) {}
-
-      try {
-        const savedUi = JSON.parse(localStorage.getItem(UI_STATE_KEY));
-        if (savedUi) uiState = { ...uiState, ...savedUi };
-      } catch (_) {}
-
-      // Initialize with default file if empty
       if (Object.keys(workspace.files).length === 0) {
-        const defaultId = generateId();
-        workspace.files[defaultId] = {
-          name: '欢迎.md',
-          content: defaultMd,
-          parentId: null,
-          type: 'file'
-        };
-        workspace.activeFileId = defaultId;
+        const id = generateId();
+        workspace.files[id] = { name: '欢迎.md', content: defaultMd, parentId: null, type: 'file' };
+        workspace.activeFileId = id;
       }
 
-      // Marked config
       marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false });
 
       const statusEl = $('#status');
-      let dirty = false;
-      let deck = null;
-      let cm = null;
-      let contextMenuTarget = null;
+      let dirty = false, deck = null, cm = null, contextMenuTarget = null, isFullscreen = false;
 
-      function setDirty(v) {
-        dirty = v;
-        renderStatus();
+      function setDirty(v) { dirty = v; renderStatus(); }
+      function renderStatus(extra) { const t = dirty ? '未保存' : '已保存'; statusEl.textContent = extra ? `${t} · ${extra}` : t; statusEl.style.borderColor = dirty ? 'rgb(234 179 8)' : 'rgb(34 197 94)'; statusEl.style.color = dirty ? 'rgb(250 204 21)' : 'rgb(134 239 172)'; }
+      function nowTime() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+      function saveWorkspace() { localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace)); localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); localStorage.setItem(UI_STATE_KEY, JSON.stringify(uiState)); }
+      function saveCurrentFile({ silent = false } = {}) { if (!workspace.activeFileId || !workspace.files[workspace.activeFileId]) return; workspace.files[workspace.activeFileId].content = cm.getValue(); saveWorkspace(); setDirty(false); renderStatus(nowTime()); if (!silent) toast('已保存'); }
+      function loadFile(fileId) { if (!workspace.files[fileId] || workspace.files[fileId].type !== 'file') return; if (workspace.activeFileId && workspace.files[workspace.activeFileId]) workspace.files[workspace.activeFileId].content = cm.getValue(); workspace.activeFileId = fileId; workspace.selectedItemId = fileId; const file = workspace.files[fileId]; cm.setValue(file.content || ''); $('#currentFileName').textContent = file.name; setDirty(false); saveWorkspace(); renderFileTree(); requestPreviewUpdate(); }
+      
+      // 获取选中项目的父级ID（用于确定新建文件/文件夹的位置）
+      function getTargetParentId() {
+        if (!workspace.selectedItemId) return null;
+        const selected = workspace.files[workspace.selectedItemId];
+        if (!selected) return null;
+        // 如果选中的是文件夹，则在该文件夹内创建
+        if (selected.type === 'folder') return workspace.selectedItemId;
+        // 如果选中的是文件，则在同级目录创建
+        return selected.parentId;
       }
-
-      function renderStatus(extra) {
-        const text = dirty ? '未保存' : '已保存';
-        statusEl.textContent = extra ? `${text} · ${extra}` : text;
-        statusEl.style.borderColor = dirty ? 'rgb(234 179 8)' : 'rgb(34 197 94)';
-        statusEl.style.color = dirty ? 'rgb(250 204 21)' : 'rgb(134 239 172)';
-      }
-
-      function nowTime() {
-        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      }
-
-      function saveWorkspace() {
-        localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        localStorage.setItem(UI_STATE_KEY, JSON.stringify(uiState));
-      }
-
-      function saveCurrentFile({ silent = false } = {}) {
-        if (!workspace.activeFileId || !workspace.files[workspace.activeFileId]) return;
-        workspace.files[workspace.activeFileId].content = cm.getValue();
-        saveWorkspace();
-        setDirty(false);
-        renderStatus(nowTime());
-        if (!silent) toast('已保存');
-      }
-
-      function loadFile(fileId) {
-        if (!workspace.files[fileId] || workspace.files[fileId].type !== 'file') return;
-        
-        if (workspace.activeFileId && workspace.files[workspace.activeFileId]) {
-          workspace.files[workspace.activeFileId].content = cm.getValue();
-        }
-        
-        workspace.activeFileId = fileId;
-        const file = workspace.files[fileId];
-        cm.setValue(file.content || '');
-        $('#currentFileName').textContent = file.name;
-        setDirty(false);
-        saveWorkspace();
-        renderFileTree();
-        requestPreviewUpdate();
-      }
-
-      function createFile(name, parentId = null) {
-        const id = generateId();
-        workspace.files[id] = {
-          name: name || '未命名.md',
-          content: '',
-          parentId,
-          type: 'file'
-        };
-        saveWorkspace();
-        renderFileTree();
-        loadFile(id);
-        toast('已创建文件');
-      }
-
-      function createFolder(name, parentId = null) {
-        const id = generateId();
-        workspace.files[id] = {
-          name: name || '新文件夹',
-          parentId,
-          type: 'folder'
-        };
-        if (!workspace.expandedFolders.includes(id)) {
-          workspace.expandedFolders.push(id);
-        }
-        saveWorkspace();
-        renderFileTree();
-        toast('已创建文件夹');
-      }
-
-      function deleteItem(id) {
-        const item = workspace.files[id];
-        if (!item) return;
-        
-        if (item.type === 'folder') {
-          Object.keys(workspace.files).forEach(fid => {
-            if (workspace.files[fid].parentId === id) deleteItem(fid);
-          });
-        }
-        
-        delete workspace.files[id];
-        
-        if (workspace.activeFileId === id) {
-          const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file');
-          workspace.activeFileId = files.length > 0 ? files[0][0] : null;
-          if (workspace.activeFileId) {
-            loadFile(workspace.activeFileId);
-          } else {
-            cm.setValue('');
-            $('#currentFileName').textContent = '';
+      
+      // 查找模板文件：从指定文件夹向上查找 _template.md
+      function findTemplate(parentId) {
+        let currentParentId = parentId;
+        while (true) {
+          // 在当前目录查找 _template.md
+          const templateFile = Object.entries(workspace.files).find(([_, f]) => 
+            f.type === 'file' && f.name === '_template.md' && f.parentId === currentParentId
+          );
+          if (templateFile) {
+            return templateFile[1].content || '';
           }
+          // 如果已经是根目录，停止查找
+          if (currentParentId === null) break;
+          // 向上查找父目录
+          const parentFolder = workspace.files[currentParentId];
+          if (!parentFolder) break;
+          currentParentId = parentFolder.parentId;
         }
-        
-        saveWorkspace();
-        renderFileTree();
-        toast('已删除');
+        return ''; // 没找到模板，返回空字符串
       }
-
-      function renameItem(id, newName) {
-        if (!workspace.files[id]) return;
-        workspace.files[id].name = newName;
-        saveWorkspace();
-        renderFileTree();
-        if (workspace.activeFileId === id) {
-          $('#currentFileName').textContent = newName;
-        }
-        toast('已重命名');
+      
+      function createFile(name, parentId = null) { 
+        const id = generateId(); 
+        const templateContent = findTemplate(parentId);
+        workspace.files[id] = { name: name || '未命名.md', content: templateContent, parentId, type: 'file' }; 
+        saveWorkspace(); 
+        renderFileTree(); 
+        loadFile(id); 
+        toast(templateContent ? '已创建文件（使用模板）' : '已创建文件'); 
       }
+      function createFolder(name, parentId = null) { const id = generateId(); workspace.files[id] = { name: name || '新文件夹', parentId, type: 'folder' }; if (!workspace.expandedFolders.includes(id)) workspace.expandedFolders.push(id); if (parentId && !workspace.expandedFolders.includes(parentId)) workspace.expandedFolders.push(parentId); workspace.selectedItemId = id; saveWorkspace(); renderFileTree(); toast('已创建文件夹'); }
+      function deleteItem(id) { const item = workspace.files[id]; if (!item) return; if (item.type === 'folder') Object.keys(workspace.files).forEach(fid => { if (workspace.files[fid].parentId === id) deleteItem(fid); }); delete workspace.files[id]; if (workspace.activeFileId === id) { const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file'); workspace.activeFileId = files.length > 0 ? files[0][0] : null; if (workspace.activeFileId) loadFile(workspace.activeFileId); else { cm.setValue(''); $('#currentFileName').textContent = ''; } } if (workspace.selectedItemId === id) workspace.selectedItemId = null; saveWorkspace(); renderFileTree(); toast('已删除'); }
+      function renameItem(id, newName) { if (!workspace.files[id]) return; workspace.files[id].name = newName; saveWorkspace(); renderFileTree(); if (workspace.activeFileId === id) $('#currentFileName').textContent = newName; toast('已重命名'); }
+      function toggleFolder(id) { const idx = workspace.expandedFolders.indexOf(id); if (idx > -1) workspace.expandedFolders.splice(idx, 1); else workspace.expandedFolders.push(id); saveWorkspace(); renderFileTree(); }
 
-      function toggleFolder(id) {
-        const idx = workspace.expandedFolders.indexOf(id);
-        if (idx > -1) {
-          workspace.expandedFolders.splice(idx, 1);
-        } else {
-          workspace.expandedFolders.push(id);
-        }
-        saveWorkspace();
-        renderFileTree();
-      }
-
-      function renderFileTree() {
-        const container = $('#fileTree');
-        container.innerHTML = '';
-        
-        function renderItems(parentId) {
-          const items = Object.entries(workspace.files)
-            .filter(([_, item]) => item.parentId === parentId)
-            .sort((a, b) => {
-              if (a[1].type !== b[1].type) return a[1].type === 'folder' ? -1 : 1;
-              return a[1].name.localeCompare(b[1].name);
-            });
-          
-          const fragment = document.createDocumentFragment();
-          
-          items.forEach(([id, item]) => {
-            const div = document.createElement('div');
-            div.className = 'file-tree-item' + (item.type === 'folder' ? ' folder' : '') + (workspace.activeFileId === id ? ' active' : '');
-            div.dataset.id = id;
-            div.dataset.type = item.type;
-            
-            const isExpanded = workspace.expandedFolders.includes(id);
-            
-            div.innerHTML = `
-              <span class="icon">${item.type === 'folder' ? (isExpanded ? '📂' : '📁') : '📄'}</span>
-              <span class="name">${item.name}</span>
-              <span class="actions">
-                <button data-action="rename" title="重命名">✏️</button>
-                <button data-action="delete" title="删除">🗑️</button>
-              </span>
-            `;
-            
-            div.addEventListener('click', (e) => {
-              if (e.target.dataset.action) return;
+      function renderFileTree() { 
+        const container = $('#fileTree'); 
+        container.innerHTML = ''; 
+        function renderItems(parentId) { 
+          const items = Object.entries(workspace.files).filter(([_, item]) => item.parentId === parentId).sort((a, b) => { if (a[1].type !== b[1].type) return a[1].type === 'folder' ? -1 : 1; return a[1].name.localeCompare(b[1].name); }); 
+          const fragment = document.createDocumentFragment(); 
+          items.forEach(([id, item]) => { 
+            const div = document.createElement('div'); 
+            const isActive = workspace.activeFileId === id;
+            const isSelected = workspace.selectedItemId === id;
+            div.className = 'file-tree-item' + (item.type === 'folder' ? ' folder' : '') + (isActive ? ' active' : '') + (isSelected && !isActive ? ' selected' : ''); 
+            div.dataset.id = id; 
+            const isExpanded = workspace.expandedFolders.includes(id); 
+            div.innerHTML = `<span class="icon">${item.type === 'folder' ? (isExpanded ? '📂' : '📁') : '📄'}</span><span class="name">${item.name}</span><span class="actions"><button data-action="rename" title="重命名">✏️</button><button data-action="delete" title="删除">🗑️</button></span>`; 
+            div.addEventListener('click', (e) => { 
+              if (e.target.dataset.action) return; 
+              workspace.selectedItemId = id;
               if (item.type === 'folder') {
                 toggleFolder(id);
               } else {
                 loadFile(id);
               }
-            });
-            
-            div.addEventListener('contextmenu', (e) => {
-              e.preventDefault();
-              showContextMenu(e, id);
-            });
-            
-            div.querySelectorAll('[data-action]').forEach(btn => {
-              btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (btn.dataset.action === 'rename') {
-                  openRenameModal(id);
-                } else if (btn.dataset.action === 'delete') {
-                  if (confirm(`确定删除 "${item.name}"？`)) deleteItem(id);
-                }
-              });
-            });
-            
-            fragment.appendChild(div);
-            
-            if (item.type === 'folder') {
-              const children = document.createElement('div');
-              children.className = 'folder-children' + (isExpanded ? '' : ' collapsed');
-              const childItems = renderItems(id);
-              if (childItems.childNodes.length > 0) children.appendChild(childItems);
-              fragment.appendChild(children);
-            }
-          });
-          
-          return fragment;
-        }
-        
-        container.appendChild(renderItems(null));
+              renderFileTree();
+            }); 
+            div.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, id); }); 
+            div.querySelectorAll('[data-action]').forEach(btn => { 
+              btn.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                if (btn.dataset.action === 'rename') openRenameModal(id); 
+                else if (btn.dataset.action === 'delete') { if (confirm(`确定删除 "${item.name}"？`)) deleteItem(id); } 
+              }); 
+            }); 
+            fragment.appendChild(div); 
+            if (item.type === 'folder') { 
+              const children = document.createElement('div'); 
+              children.className = 'folder-children' + (isExpanded ? '' : ' collapsed'); 
+              const childItems = renderItems(id); 
+              if (childItems.childNodes.length > 0) children.appendChild(childItems); 
+              fragment.appendChild(children); 
+            } 
+          }); 
+          return fragment; 
+        } 
+        container.appendChild(renderItems(null)); 
       }
-
-      function showContextMenu(e, id) {
-        contextMenuTarget = id;
-        const menu = $('#contextMenu');
-        const item = workspace.files[id];
-        
-        menu.innerHTML = `
-          ${item.type === 'folder' ? `
-            <div class="context-menu-item" data-action="newFile">📄 新建文件</div>
-            <div class="context-menu-item" data-action="newFolder">📁 新建文件夹</div>
-          ` : ''}
-          <div class="context-menu-item" data-action="rename">✏️ 重命名</div>
-          <div class="context-menu-item danger" data-action="delete">🗑️ 删除</div>
-        `;
-        
-        menu.style.display = 'block';
-        menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px';
-        menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px';
-      }
-
-      document.addEventListener('click', () => {
-        $('#contextMenu').style.display = 'none';
-      });
-
-      $('#contextMenu').addEventListener('click', (e) => {
-        const action = e.target.dataset.action;
-        if (!action || !contextMenuTarget) return;
-        
-        const item = workspace.files[contextMenuTarget];
-        
-        if (action === 'rename') {
-          openRenameModal(contextMenuTarget);
-        } else if (action === 'delete') {
-          if (confirm(`确定删除 "${item.name}"？`)) deleteItem(contextMenuTarget);
-        } else if (action === 'newFile') {
-          createFile('未命名.md', contextMenuTarget);
-        } else if (action === 'newFolder') {
-          createFolder('新文件夹', contextMenuTarget);
-        }
-        
-        $('#contextMenu').style.display = 'none';
-      });
+      function showContextMenu(e, id) { contextMenuTarget = id; workspace.selectedItemId = id; renderFileTree(); const menu = $('#contextMenu'); const item = workspace.files[id]; menu.innerHTML = `${item.type === 'folder' ? `<div class="context-menu-item" data-action="newFile">📄 新建文件</div><div class="context-menu-item" data-action="newFolder">📁 新建文件夹</div>` : ''}<div class="context-menu-item" data-action="rename">✏️ 重命名</div><div class="context-menu-item danger" data-action="delete">🗑️ 删除</div>`; menu.style.display = 'block'; menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px'; menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px'; }
+      document.addEventListener('click', () => $('#contextMenu').style.display = 'none');
+      $('#contextMenu').addEventListener('click', (e) => { const action = e.target.dataset.action; if (!action || !contextMenuTarget) return; const item = workspace.files[contextMenuTarget]; if (action === 'rename') openRenameModal(contextMenuTarget); else if (action === 'delete') { if (confirm(`确定删除 "${item.name}"？`)) deleteItem(contextMenuTarget); } else if (action === 'newFile') createFile('未命名.md', contextMenuTarget); else if (action === 'newFolder') createFolder('新文件夹', contextMenuTarget); $('#contextMenu').style.display = 'none'; });
 
       let renameTargetId = null;
-      
-      function openRenameModal(id) {
-        renameTargetId = id;
-        const item = workspace.files[id];
-        $('#renameModalTitle').textContent = item.type === 'folder' ? '重命名文件夹' : '重命名文件';
-        $('#renameInput').value = item.name;
-        $('#renameModal').style.display = 'block';
-        $('#renameModal').setAttribute('aria-hidden', 'false');
-        setTimeout(() => $('#renameInput').select(), 50);
-      }
+      function openRenameModal(id) { renameTargetId = id; const item = workspace.files[id]; $('#renameModalTitle').textContent = item.type === 'folder' ? '重命名文件夹' : '重命名文件'; $('#renameInput').value = item.name; $('#renameModal').setAttribute('aria-hidden', 'false'); setTimeout(() => $('#renameInput').select(), 50); }
+      function closeRenameModal() { $('#renameModal').setAttribute('aria-hidden', 'true'); renameTargetId = null; }
+      $('#renameModalBg').addEventListener('click', closeRenameModal);
+      $('#btnCancelRename').addEventListener('click', closeRenameModal);
+      $('#renameConfirm').addEventListener('click', () => { const newName = $('#renameInput').value.trim(); if (newName && renameTargetId) renameItem(renameTargetId, newName); closeRenameModal(); });
+      $('#renameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#renameConfirm').click(); else if (e.key === 'Escape') closeRenameModal(); });
 
-      function closeRenameModal() {
-        $('#renameModal').style.display = 'none';
-        $('#renameModal').setAttribute('aria-hidden', 'true');
-        renameTargetId = null;
-      }
+      function exportWorkspace() { const data = { version: 3, exportDate: new Date().toISOString(), workspace, settings }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `reveal-workspace-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast('已导出工作区'); }
+      function importWorkspace(file) { const reader = new FileReader(); reader.onload = () => { try { const data = JSON.parse(reader.result); if (!data.workspace || !data.workspace.files) throw new Error('Invalid'); workspace.activeFileId = null; workspace = data.workspace; if (data.settings) { settings = { ...settings, ...data.settings }; applySettings(); } saveWorkspace(); renderFileTree(); let targetFileId = workspace.activeFileId; if (!targetFileId || !workspace.files[targetFileId]) { const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file'); targetFileId = files.length > 0 ? files[0][0] : null; } if (targetFileId && workspace.files[targetFileId]) { workspace.activeFileId = targetFileId; const file = workspace.files[targetFileId]; cm.setValue(file.content || ''); $('#currentFileName').textContent = file.name; setDirty(false); saveWorkspace(); renderFileTree(); requestPreviewUpdate(); } else { cm.setValue(''); $('#currentFileName').textContent = ''; } toast('已导入工作区'); } catch (e) { toast('导入失败'); } }; reader.readAsText(file); }
 
-      $('#renameModal').addEventListener('click', (e) => {
-        if (e.target.dataset.close) closeRenameModal();
-      });
+      function updateToggleButtons() { $('#btnToggleLeft').classList.toggle('active', uiState.leftSidebarOpen); $('#btnToggleRight').classList.toggle('active', uiState.rightSidebarOpen); $('#btnToggleEditor').classList.toggle('active', uiState.editorVisible); $('#btnTogglePreview').classList.toggle('active', uiState.previewVisible); }
+      function toggleLeftSidebar() { uiState.leftSidebarOpen = !uiState.leftSidebarOpen; $('#leftSidebar').classList.toggle('collapsed', !uiState.leftSidebarOpen); updateToggleButtons(); saveWorkspace(); setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250); }
+      function toggleRightSidebar() { uiState.rightSidebarOpen = !uiState.rightSidebarOpen; $('#rightSidebar').classList.toggle('collapsed', !uiState.rightSidebarOpen); updateToggleButtons(); saveWorkspace(); setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250); }
+      function toggleEditor() { if (uiState.editorVisible && !uiState.previewVisible) return toast('至少需要显示一个面板'); uiState.editorVisible = !uiState.editorVisible; $('#editorPanel').classList.toggle('hidden-panel', !uiState.editorVisible); updateToggleButtons(); saveWorkspace(); setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250); }
+      function togglePreview() { if (uiState.previewVisible && !uiState.editorVisible) return toast('至少需要显示一个面板'); uiState.previewVisible = !uiState.previewVisible; $('#previewPanel').classList.toggle('hidden-panel', !uiState.previewVisible); updateToggleButtons(); saveWorkspace(); setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250); }
 
-      $('#renameConfirm').addEventListener('click', () => {
-        const newName = $('#renameInput').value.trim();
-        if (newName && renameTargetId) renameItem(renameTargetId, newName);
-        closeRenameModal();
-      });
-
-      $('#renameInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') $('#renameConfirm').click();
-        else if (e.key === 'Escape') closeRenameModal();
-      });
-
-      // Export/Import workspace
-      function exportWorkspace() {
-        const data = {
-          version: 3,
-          exportDate: new Date().toISOString(),
-          workspace,
-          settings
-        };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const stamp = new Date().toISOString().slice(0, 10);
-        a.href = url;
-        a.download = `reveal-workspace-${stamp}.json`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        toast('已导出工作区');
-      }
-
-      function importWorkspace(file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const data = JSON.parse(reader.result);
-            if (!data.workspace || !data.workspace.files) throw new Error('Invalid');
-            workspace = data.workspace;
-            if (data.settings) {
-              settings = { ...settings, ...data.settings };
-              applySettings();
-            }
-            saveWorkspace();
-            renderFileTree();
-            
-            if (workspace.activeFileId && workspace.files[workspace.activeFileId]) {
-              loadFile(workspace.activeFileId);
-            } else {
-              const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file');
-              if (files.length > 0) loadFile(files[0][0]);
-            }
-            
-            toast('已导入工作区');
-          } catch (e) {
-            toast('导入失败：文件格式错误');
-          }
-        };
-        reader.readAsText(file);
-      }
-
-      // UI State handlers
-      function updateToggleButtons() {
-        $('#btnToggleLeft').classList.toggle('active', uiState.leftSidebarOpen);
-        $('#btnToggleRight').classList.toggle('active', uiState.rightSidebarOpen);
-        $('#btnToggleEditor').classList.toggle('active', uiState.editorVisible);
-        $('#btnTogglePreview').classList.toggle('active', uiState.previewVisible);
-      }
-
-      function toggleLeftSidebar() {
-        uiState.leftSidebarOpen = !uiState.leftSidebarOpen;
-        $('#leftSidebar').classList.toggle('collapsed', !uiState.leftSidebarOpen);
-        updateToggleButtons();
-        saveWorkspace();
-        setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250);
-      }
-
-      function toggleRightSidebar() {
-        uiState.rightSidebarOpen = !uiState.rightSidebarOpen;
-        $('#rightSidebar').classList.toggle('collapsed', !uiState.rightSidebarOpen);
-        updateToggleButtons();
-        saveWorkspace();
-        setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250);
-      }
-
-      function toggleEditor() {
-        // Don't allow hiding both panels
-        if (uiState.editorVisible && !uiState.previewVisible) {
-          toast('至少需要显示一个面板');
-          return;
-        }
-        uiState.editorVisible = !uiState.editorVisible;
-        $('#editorPanel').classList.toggle('hidden-panel', !uiState.editorVisible);
-        updateToggleButtons();
-        saveWorkspace();
-        setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250);
-      }
-
-      function togglePreview() {
-        // Don't allow hiding both panels
-        if (uiState.previewVisible && !uiState.editorVisible) {
-          toast('至少需要显示一个面板');
-          return;
-        }
-        uiState.previewVisible = !uiState.previewVisible;
-        $('#previewPanel').classList.toggle('hidden-panel', !uiState.previewVisible);
-        updateToggleButtons();
-        saveWorkspace();
-        setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250);
-      }
-
-      // Apply initial UI state
       if (!uiState.leftSidebarOpen) $('#leftSidebar').classList.add('collapsed');
       if (!uiState.rightSidebarOpen) $('#rightSidebar').classList.add('collapsed');
       if (!uiState.editorVisible) $('#editorPanel').classList.add('hidden-panel');
       if (!uiState.previewVisible) $('#previewPanel').classList.add('hidden-panel');
       updateToggleButtons();
 
-      // Settings handlers
-      function applySettings() {
-        $('#settingAutoSave').checked = settings.autoSave;
-        $('#settingLineWrap').checked = settings.lineWrap;
-        $('#settingFontSize').value = settings.fontSize;
-        $('#settingTheme').value = settings.theme;
-        $('#settingTransition').value = settings.transition;
-        $('#settingControls').checked = settings.controls;
-        $('#settingProgress').checked = settings.progress;
-        $('#settingSlideNumber').checked = settings.slideNumber;
+      function applySettings() { $('#settingAutoSave').checked = settings.autoSave; $('#settingLineWrap').checked = settings.lineWrap; $('#settingFontSize').value = settings.fontSize; $('#settingTheme').value = settings.theme; $('#settingTransition').value = settings.transition; $('#settingControls').checked = settings.controls; $('#settingProgress').checked = settings.progress; $('#settingSlideNumber').checked = settings.slideNumber; $('#settingSyncSlide').checked = settings.syncSlide; $('#settingOverflowWarn').checked = settings.overflowWarn; $('#revealTheme').href = `https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${settings.theme}.css`; if (cm) { cm.setOption('lineWrapping', settings.lineWrap); $('.CodeMirror').style.fontSize = settings.fontSize + 'px'; } if (deck) deck.configure({ transition: settings.transition, controls: settings.controls, progress: settings.progress, slideNumber: settings.slideNumber }); }
+      $('#settingAutoSave').addEventListener('change', (e) => { settings.autoSave = e.target.checked; saveWorkspace(); });
+      $('#settingLineWrap').addEventListener('change', (e) => { settings.lineWrap = e.target.checked; cm.setOption('lineWrapping', settings.lineWrap); saveWorkspace(); });
+      $('#settingFontSize').addEventListener('change', (e) => { settings.fontSize = parseInt(e.target.value); $('.CodeMirror').style.fontSize = settings.fontSize + 'px'; cm.refresh(); saveWorkspace(); });
+      $('#settingTheme').addEventListener('change', (e) => { settings.theme = e.target.value; $('#revealTheme').href = `https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${settings.theme}.css`; saveWorkspace(); });
+      $('#settingTransition').addEventListener('change', (e) => { settings.transition = e.target.value; if (deck) deck.configure({ transition: settings.transition }); saveWorkspace(); });
+      $('#settingControls').addEventListener('change', (e) => { settings.controls = e.target.checked; if (deck) deck.configure({ controls: settings.controls }); saveWorkspace(); });
+      $('#settingProgress').addEventListener('change', (e) => { settings.progress = e.target.checked; if (deck) deck.configure({ progress: settings.progress }); saveWorkspace(); });
+      $('#settingSlideNumber').addEventListener('change', (e) => { settings.slideNumber = e.target.checked; if (deck) deck.configure({ slideNumber: settings.slideNumber }); saveWorkspace(); });
+      $('#settingSyncSlide').addEventListener('change', (e) => { settings.syncSlide = e.target.checked; saveWorkspace(); });
+      $('#settingOverflowWarn').addEventListener('change', (e) => { settings.overflowWarn = e.target.checked; saveWorkspace(); });
+
+      function splitSlides(md) { const normalized = String(md || '').replace(/\r\n/g, '\n'); const h = normalized.split(/\n\s*---\s*\n/g); return h.map(part => part.split(/\n\s*--\s*\n/g)); }
+      function renderSlideMarkdown(mdChunk) { const src = String(mdChunk || '').trim(); if (!src) return '<p style="opacity:0.5">（空白页）</p>'; return marked.parse(src); }
+      function buildSlidesHtml(md) { const groups = splitSlides(md); let out = ''; for (const verticalGroup of groups) { if (verticalGroup.length > 1) { out += '<section>'; for (const v of verticalGroup) out += `<section>${renderSlideMarkdown(v)}</section>`; out += '</section>'; } else out += `<section>${renderSlideMarkdown(verticalGroup[0])}</section>`; } return out; }
+      
+      // 根据光标位置计算当前幻灯片索引
+      function getSlideIndexFromCursor() {
+        if (!cm) return { h: 0, v: 0 };
+        const cursor = cm.getCursor();
+        const content = cm.getValue();
+        const lines = content.split('\n');
         
-        const themeLink = $('#revealTheme');
-        themeLink.href = `https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${settings.theme}.css`;
+        let h = 0, v = 0;
+        let currentLine = 0;
         
-        if (cm) {
-          cm.setOption('lineWrapping', settings.lineWrap);
-          document.querySelector('.CodeMirror').style.fontSize = settings.fontSize + 'px';
+        for (let i = 0; i < lines.length && currentLine <= cursor.line; i++) {
+          const line = lines[i].trim();
+          if (line === '---' && i > 0) {
+            h++;
+            v = 0;
+          } else if (line === '--' && i > 0) {
+            v++;
+          }
+          currentLine++;
         }
         
-        if (deck) {
-          deck.configure({
-            transition: settings.transition,
-            controls: settings.controls,
-            progress: settings.progress,
-            slideNumber: settings.slideNumber
-          });
+        return { h, v };
+      }
+      
+      async function ensureDeck() { if (deck) return deck; deck = new Reveal($('#revealRoot'), { embedded: true, hash: false, controls: settings.controls, progress: settings.progress, slideNumber: settings.slideNumber, center: true, transition: settings.transition, backgroundTransition: 'fade', touch: true, touchDistance: 50, navigationMode: 'default', loop: false, plugins: [RevealNotes, RevealHighlight], keyboardCondition: 'focused' }); await deck.initialize(); deck.layout(); return deck; }
+      function highlightPreview() { try { if (window.hljs) window.hljs.highlightAll(); } catch (_) {} }
+      
+      const requestPreviewUpdate = debounce(async () => { 
+        const md = cm.getValue(); 
+        const slidesEl = $('#slides'); 
+        
+        // 如果开启了同步，根据光标位置计算幻灯片索引
+        let idx;
+        if (settings.syncSlide) {
+          idx = getSlideIndexFromCursor();
+        } else {
+          idx = deck ? deck.getIndices() : { h: 0, v: 0, f: 0 };
         }
-      }
-
-      // Setting change handlers
-      $('#settingAutoSave').addEventListener('change', (e) => {
-        settings.autoSave = e.target.checked;
-        saveWorkspace();
-        toast(settings.autoSave ? '自动保存：开启' : '自动保存：关闭');
-      });
-
-      $('#settingLineWrap').addEventListener('change', (e) => {
-        settings.lineWrap = e.target.checked;
-        cm.setOption('lineWrapping', settings.lineWrap);
-        saveWorkspace();
-      });
-
-      $('#settingFontSize').addEventListener('change', (e) => {
-        settings.fontSize = parseInt(e.target.value);
-        document.querySelector('.CodeMirror').style.fontSize = settings.fontSize + 'px';
-        cm.refresh();
-        saveWorkspace();
-      });
-
-      $('#settingTheme').addEventListener('change', (e) => {
-        settings.theme = e.target.value;
-        $('#revealTheme').href = `https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${settings.theme}.css`;
-        saveWorkspace();
-      });
-
-      $('#settingTransition').addEventListener('change', (e) => {
-        settings.transition = e.target.value;
-        if (deck) deck.configure({ transition: settings.transition });
-        saveWorkspace();
-      });
-
-      $('#settingControls').addEventListener('change', (e) => {
-        settings.controls = e.target.checked;
-        if (deck) deck.configure({ controls: settings.controls });
-        saveWorkspace();
-      });
-
-      $('#settingProgress').addEventListener('change', (e) => {
-        settings.progress = e.target.checked;
-        if (deck) deck.configure({ progress: settings.progress });
-        saveWorkspace();
-      });
-
-      $('#settingSlideNumber').addEventListener('change', (e) => {
-        settings.slideNumber = e.target.checked;
-        if (deck) deck.configure({ slideNumber: settings.slideNumber });
-        saveWorkspace();
-      });
-
-      // Slide building
-      function splitSlides(md) {
-        const normalized = String(md || '').replace(/\r\n/g, '\n');
-        const h = normalized.split(/\n\s*---\s*\n/g);
-        return h.map(part => part.split(/\n\s*--\s*\n/g));
-      }
-
-      function renderSlideMarkdown(mdChunk) {
-        const src = String(mdChunk || '').trim();
-        if (!src) return '<p style="opacity:0.5">（空白页）</p>';
-        return marked.parse(src);
-      }
-
-      function buildSlidesHtml(md) {
-        const groups = splitSlides(md);
-        let out = '';
-        for (const verticalGroup of groups) {
-          if (verticalGroup.length > 1) {
-            out += '<section>';
-            for (const v of verticalGroup) {
-              out += `<section>${renderSlideMarkdown(v)}</section>`;
-            }
-            out += '</section>';
-          } else {
-            out += `<section>${renderSlideMarkdown(verticalGroup[0])}</section>`;
-          }
-        }
-        return out;
-      }
-
-      async function ensureDeck() {
-        if (deck) return deck;
-
-        deck = new Reveal($('#revealRoot'), {
-          embedded: true,
-          hash: false,
-          controls: settings.controls,
-          progress: settings.progress,
-          slideNumber: settings.slideNumber,
-          center: true,
-          transition: settings.transition,
-          backgroundTransition: 'fade',
-          touch: true,
-          plugins: [RevealNotes, RevealHighlight],
-          keyboardCondition: (event) => {
-            const ae = document.activeElement;
-            const editorPanel = $('#editorPanel');
-            if (ae && editorPanel && editorPanel.contains(ae)) return false;
-            return true;
-          }
-        });
-
-        await deck.initialize();
-        deck.layout();
-        return deck;
-      }
-
-      function highlightPreview() {
-        try {
-          if (window.hljs && typeof window.hljs.highlightAll === 'function') {
-            window.hljs.highlightAll();
-          }
-        } catch (_) {}
-      }
-
-      const requestPreviewUpdate = debounce(async () => {
-        const md = cm.getValue();
-        const slidesEl = $('#slides');
-
-        const idx = deck ? deck.getIndices() : { h: 0, v: 0, f: 0 };
-        slidesEl.innerHTML = buildSlidesHtml(md);
-
-        const d = await ensureDeck();
-        d.sync();
-        d.layout();
-        try { d.slide(idx.h, idx.v, idx.f); } catch (_) {}
-        setTimeout(highlightPreview, 0);
-
-        if (settings.autoSave) {
-          saveCurrentFile({ silent: true });
-        }
+        
+        slidesEl.innerHTML = buildSlidesHtml(md); 
+        const d = await ensureDeck(); 
+        d.sync(); 
+        d.layout(); 
+        try { d.slide(idx.h, idx.v, idx.f || 0); } catch (_) {} 
+        setTimeout(highlightPreview, 0); 
+        if (settings.autoSave) saveCurrentFile({ silent: true });
+        checkSlideOverflow();
       }, 260);
 
-      // Initialize CodeMirror
-      const initialContent = workspace.activeFileId && workspace.files[workspace.activeFileId] 
-        ? workspace.files[workspace.activeFileId].content 
-        : '';
-      
-      cm = CodeMirror($('#editor'), {
-        value: initialContent,
-        mode: { name: 'markdown', fencedCodeBlocks: true, strikethrough: true, taskLists: true },
-        theme: 'material-darker',
-        lineNumbers: true,
-        lineWrapping: settings.lineWrap,
-        indentUnit: 2,
-        tabSize: 2,
-        autofocus: false,
-        extraKeys: {
-          'Ctrl-S': () => saveCurrentFile(),
-          'Cmd-S': () => saveCurrentFile(),
-          'Alt-Enter': () => toggleFullscreen(),
-          'Ctrl-N': () => createFile(),
-          'Cmd-N': () => createFile(),
-          'Ctrl-B': () => toggleLeftSidebar(),
-          'Cmd-B': () => toggleLeftSidebar(),
-        }
-      });
-
+      const initialContent = workspace.activeFileId && workspace.files[workspace.activeFileId] ? workspace.files[workspace.activeFileId].content : '';
+      cm = CodeMirror($('#editor'), { value: initialContent, mode: { name: 'markdown', fencedCodeBlocks: true, strikethrough: true, taskLists: true }, theme: 'material-darker', lineNumbers: true, lineWrapping: settings.lineWrap, indentUnit: 2, tabSize: 2, autofocus: false, extraKeys: { 'Ctrl-S': () => saveCurrentFile(), 'Cmd-S': () => saveCurrentFile(), 'Alt-Enter': () => toggleFullscreen(), 'Ctrl-N': () => createFile(null, getTargetParentId()), 'Cmd-N': () => createFile(null, getTargetParentId()), 'Ctrl-B': () => toggleLeftSidebar(), 'Cmd-B': () => toggleLeftSidebar() } });
       applySettings();
-
-      if (workspace.activeFileId && workspace.files[workspace.activeFileId]) {
-        $('#currentFileName').textContent = workspace.files[workspace.activeFileId].name;
-      }
-
-      renderStatus('已加载');
-      renderFileTree();
-      $('#slides').innerHTML = buildSlidesHtml(initialContent);
+      if (workspace.activeFileId && workspace.files[workspace.activeFileId]) $('#currentFileName').textContent = workspace.files[workspace.activeFileId].name;
+      renderStatus('已加载'); renderFileTree(); $('#slides').innerHTML = buildSlidesHtml(initialContent);
       ensureDeck().then(() => setTimeout(highlightPreview, 0));
-
-      cm.on('change', () => {
-        setDirty(true);
-        requestPreviewUpdate();
-      });
-
-      // Button handlers
-      $('#btnSave').addEventListener('click', () => saveCurrentFile());
-      $('#btnToggleLeft').addEventListener('click', toggleLeftSidebar);
-      $('#btnToggleRight').addEventListener('click', toggleRightSidebar);
-      $('#btnToggleEditor').addEventListener('click', toggleEditor);
-      $('#btnTogglePreview').addEventListener('click', togglePreview);
-      $('#btnNewFile').addEventListener('click', () => createFile());
-      $('#btnNewFolder').addEventListener('click', () => createFolder());
-      $('#btnExportWorkspace').addEventListener('click', exportWorkspace);
+      cm.on('change', () => { setDirty(true); requestPreviewUpdate(); });
       
-      $('#btnImportWorkspace').addEventListener('click', () => {
-        $('#workspaceInput').value = '';
-        $('#workspaceInput').click();
+      // 光标位置变化时同步幻灯片
+      cm.on('cursorActivity', () => {
+        if (settings.syncSlide && deck) {
+          const idx = getSlideIndexFromCursor();
+          try { deck.slide(idx.h, idx.v, 0); } catch (_) {}
+        }
       });
+
+      $('#btnSave').onclick = () => saveCurrentFile();
+      $('#btnToggleLeft').onclick = toggleLeftSidebar;
+      $('#btnToggleRight').onclick = toggleRightSidebar;
+      $('#btnToggleEditor').onclick = toggleEditor;
+      $('#btnTogglePreview').onclick = togglePreview;
+      $('#btnNewFile').onclick = () => createFile(null, getTargetParentId());
+      $('#btnNewFolder').onclick = () => createFolder(null, getTargetParentId());
+      $('#btnExportWorkspace').onclick = exportWorkspace;
+      $('#btnImportWorkspace').onclick = () => { $('#workspaceInput').value = ''; $('#workspaceInput').click(); };
+      $('#workspaceInput').onchange = (e) => { if (e.target.files[0]) importWorkspace(e.target.files[0]); };
+      $('#btnClearWorkspace').onclick = () => { if (!confirm('清空所有？')) return; workspace = { files: {}, activeFileId: null, selectedItemId: null, expandedFolders: [] }; const id = generateId(); workspace.files[id] = { name: '未命名.md', content: '', parentId: null, type: 'file' }; workspace.activeFileId = id; saveWorkspace(); renderFileTree(); loadFile(id); toast('已清空'); };
+      $('#btnExport').onclick = () => { const blob = new Blob([cm.getValue()], { type: 'text/markdown' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); const fname = workspace.activeFileId ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '') : 'slides'; a.href = url; a.download = `${fname}.md`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast('已导出'); };
+      $('#btnImport').onclick = () => { $('#fileInput').value = ''; $('#fileInput').click(); };
+      $('#fileInput').onchange = (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = () => { const parentId = getTargetParentId(); const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); };
       
-      $('#workspaceInput').addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) importWorkspace(file);
-      });
-
-      $('#btnClearWorkspace').addEventListener('click', () => {
-        if (!confirm('确定要清空整个工作区吗？所有文件将被删除！')) return;
-        workspace = { files: {}, activeFileId: null, expandedFolders: [] };
-        const defaultId = generateId();
-        workspace.files[defaultId] = {
-          name: '未命名.md',
-          content: '',
-          parentId: null,
-          type: 'file'
-        };
-        workspace.activeFileId = defaultId;
-        saveWorkspace();
-        renderFileTree();
-        loadFile(defaultId);
-        toast('工作区已清空');
-      });
-
-      // Export/Import single file
-      function exportMd() {
+      // PDF 导出
+      $('#btnExportPDF').onclick = () => {
         const md = cm.getValue();
-        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const fileName = workspace.activeFileId && workspace.files[workspace.activeFileId]
-          ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '')
-          : 'slides';
-        a.href = url;
-        a.download = `${fileName}.md`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        toast('已导出');
-      }
+        const theme = settings.theme;
+        const fname = workspace.activeFileId ? workspace.files[workspace.activeFileId].name.replace(/\.[^.]+$/, '') : 'slides';
+        
+        const groups = splitSlides(md);
+        let flatSlides = [];
+        groups.forEach(group => {
+          group.forEach(slide => {
+            flatSlides.push(renderSlideMarkdown(slide));
+          });
+        });
+        
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) { toast('无法打开窗口'); return; }
+        
+        const slidePagesHtml = flatSlides.map((content, i) => 
+          `<div class="slide-page"><div class="slide-content">${content}</div><div class="slide-number">${i + 1} / ${flatSlides.length}</div></div>`
+        ).join('');
+        
+        printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${fname} - PDF 导出</title>
+  <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${theme}.css">
+  <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page { size: A4 landscape; margin: 0; }
+    html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .slide-page { width: 297mm; height: 210mm; padding: 15mm; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; page-break-inside: avoid; position: relative; background: var(--r-background-color, #191919); color: var(--r-main-color, #fff); -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    .slide-page:last-child { page-break-after: auto; }
+    .slide-content { width: 100%; max-width: 240mm; text-align: center; font-size: 24pt; line-height: 1.4; }
+    .slide-content h1 { font-size: 48pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
+    .slide-content h2 { font-size: 36pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
+    .slide-content h3 { font-size: 28pt; margin-bottom: 0.5em; color: var(--r-heading-color, #fff); }
+    .slide-content p { margin-bottom: 0.5em; font-size: 24pt; }
+    .slide-content ul, .slide-content ol { text-align: left; display: inline-block; margin: 0.5em 0; font-size: 22pt; }
+    .slide-content li { margin: 0.3em 0; }
+    .slide-content pre { text-align: left; background: rgba(0,0,0,0.3); padding: 1em; border-radius: 8px; overflow: auto; font-size: 16pt; margin: 0.5em 0; }
+    .slide-content code { font-family: 'Monaco', 'Menlo', monospace; font-size: 0.9em; }
+    .slide-content table { margin: 0.5em auto; border-collapse: collapse; font-size: 20pt; }
+    .slide-content th, .slide-content td { border: 1px solid rgba(255,255,255,0.3); padding: 0.4em 0.8em; }
+    .slide-content img { max-width: 100%; max-height: 120mm; }
+    .slide-content blockquote { border-left: 4px solid var(--r-link-color, #42affa); padding-left: 1em; margin: 0.5em 0; font-style: italic; text-align: left; font-size: 20pt; }
+    .slide-number { position: absolute; bottom: 8mm; right: 10mm; font-size: 10pt; opacity: 0.5; }
+    @media screen { body { background: #1e293b; padding-bottom: 40px; } .print-header { position: sticky; top: 0; z-index: 100; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 16px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #334155; flex-wrap: wrap; } .print-header h1 { font-size: 18px; color: white; font-weight: 600; } .print-header .info { color: #94a3b8; font-size: 13px; } .print-header .info strong { color: #60a5fa; } .print-header .spacer { flex: 1; } .print-header button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; } .print-header .btn-print { background: #3b82f6; color: white; } .print-header .btn-print:hover { background: #2563eb; } .print-header .btn-close { background: #475569; color: white; } .print-header .btn-close:hover { background: #64748b; } .slides-container { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px; } .slide-page { width: 297mm; height: 210mm; transform: scale(0.35); transform-origin: top center; margin-bottom: -125mm; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); } @media (min-width: 800px) { .slide-page { transform: scale(0.5); margin-bottom: -105mm; } } @media (min-width: 1200px) { .slide-page { transform: scale(0.7); margin-bottom: -63mm; } } }
+    @media print { .print-header { display: none !important; } .slides-container { padding: 0; gap: 0; } .slide-page { width: 297mm !important; height: 210mm !important; max-width: none; border-radius: 0; box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <div class="print-header"><h1>📄 ${fname}</h1><div class="info">共 <strong>${flatSlides.length}</strong> 页 · 打印设置：<strong>A4 横向</strong>、边距<strong>无</strong>、勾选<strong>背景图形</strong></div><div class="spacer"></div><button class="btn-print" onclick="window.print()">🖨️ 打印 / 保存 PDF</button><button class="btn-close" onclick="window.close()">✕ 关闭</button></div>
+  <div class="slides-container">${slidePagesHtml}</div>
+  <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"><\/script>
+  <script>if (typeof hljs !== 'undefined') { document.querySelectorAll('pre code').forEach(block => { hljs.highlightElement(block); }); }<\/script>
+</body>
+</html>`);
+        printWindow.document.close();
+        toast('PDF 导出窗口已打开');
+      };
 
-      function importFile(file) {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const text = String(reader.result || '');
-          const id = generateId();
-          workspace.files[id] = {
-            name: file.name,
-            content: text,
-            parentId: null,
-            type: 'file'
-          };
+      // 批注系统
+      const canvas = $('#annotationCanvas');
+      const ctx = canvas.getContext('2d');
+      const toolbar = $('#annotationToolbar');
+      let annoState = { 
+        tool: 'pointer', color: '#ef4444', strokeWidth: 4, 
+        isDrawing: false, startX: 0, startY: 0, lastX: 0, lastY: 0, 
+        currentPath: null, toolbarVisible: true,
+        snapshot: null, history: []
+      };
+
+      function resizeCanvas() { 
+        if (!isFullscreen) return; 
+        const rect = canvas.parentElement.getBoundingClientRect(); 
+        canvas.width = rect.width; 
+        canvas.height = rect.height; 
+      }
+      
+      function saveSnapshot() { annoState.snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height); }
+      function restoreSnapshot() { if (annoState.snapshot) ctx.putImageData(annoState.snapshot, 0, 0); }
+      function saveToHistory() { annoState.history.push(ctx.getImageData(0, 0, canvas.width, canvas.height)); if (annoState.history.length > 50) annoState.history.shift(); }
+      function undo() { if (annoState.history.length > 0) ctx.putImageData(annoState.history.pop(), 0, 0); }
+      
+      function drawArrow(x1, y1, x2, y2, color, width) { 
+        const head = Math.max(width * 3, 12); 
+        const angle = Math.atan2(y2 - y1, x2 - x1); 
+        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; 
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); 
+        ctx.beginPath(); ctx.fillStyle = color; ctx.moveTo(x2, y2); 
+        ctx.lineTo(x2 - head * Math.cos(angle - Math.PI/6), y2 - head * Math.sin(angle - Math.PI/6)); 
+        ctx.lineTo(x2 - head * Math.cos(angle + Math.PI/6), y2 - head * Math.sin(angle + Math.PI/6)); 
+        ctx.closePath(); ctx.fill(); 
+      }
+      function drawLine(x1, y1, x2, y2, color, width) { ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+      function drawRect(x1, y1, x2, y2, color, width) { ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1)); }
+      function drawEllipse(x1, y1, x2, y2, color, width) { const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2; ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke(); }
+      function getPos(e) { const r = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; return { x: cx - r.left, y: cy - r.top }; }
+      
+      function startDraw(e) { 
+        if (!isFullscreen || annoState.tool === 'pointer') return; 
+        e.preventDefault(); e.stopPropagation(); 
+        const p = getPos(e); 
+        annoState.isDrawing = true; annoState.startX = p.x; annoState.startY = p.y; annoState.lastX = p.x; annoState.lastY = p.y; 
+        if (['line', 'arrow', 'rect', 'ellipse'].includes(annoState.tool)) saveSnapshot();
+        saveToHistory();
+        if (annoState.tool === 'pen' || annoState.tool === 'highlighter') annoState.currentPath = [{ x: p.x, y: p.y }];
+      }
+      
+      function draw(e) { 
+        if (!isFullscreen || !annoState.isDrawing || annoState.tool === 'pointer') return; 
+        e.preventDefault(); e.stopPropagation(); 
+        const p = getPos(e); 
+        
+        if (annoState.tool === 'pen') { 
+          ctx.beginPath(); ctx.strokeStyle = annoState.color; ctx.lineWidth = annoState.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; 
+          ctx.moveTo(annoState.lastX, annoState.lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); 
+          if (annoState.currentPath) annoState.currentPath.push({ x: p.x, y: p.y }); 
+        } else if (annoState.tool === 'highlighter') {
+          ctx.beginPath(); ctx.strokeStyle = annoState.color; ctx.lineWidth = annoState.strokeWidth * 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 0.3;
+          ctx.moveTo(annoState.lastX, annoState.lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.globalAlpha = 1.0;
+          if (annoState.currentPath) annoState.currentPath.push({ x: p.x, y: p.y });
+        } else if (annoState.tool === 'line') { restoreSnapshot(); drawLine(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'arrow') { restoreSnapshot(); drawArrow(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'rect') { restoreSnapshot(); drawRect(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'ellipse') { restoreSnapshot(); drawEllipse(annoState.startX, annoState.startY, p.x, p.y, annoState.color, annoState.strokeWidth); }
+        else if (annoState.tool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(p.x, p.y, annoState.strokeWidth * 3, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+        
+        annoState.lastX = p.x; annoState.lastY = p.y; 
+      }
+      
+      function stopDraw(e) { if (!isFullscreen || !annoState.isDrawing) return; annoState.isDrawing = false; annoState.currentPath = null; annoState.snapshot = null; }
+      
+      canvas.addEventListener('mousedown', startDraw); 
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', stopDraw); 
+      canvas.addEventListener('mouseleave', stopDraw);
+      canvas.addEventListener('touchstart', startDraw, { passive: false }); 
+      canvas.addEventListener('touchmove', draw, { passive: false });
+      canvas.addEventListener('touchend', stopDraw); 
+      canvas.addEventListener('touchcancel', stopDraw);
+
+      // 工具按钮
+      $$('[data-tool]').forEach(b => b.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        annoState.tool = b.dataset.tool; 
+        $$('[data-tool]').forEach(x => x.classList.remove('active')); 
+        b.classList.add('active'); 
+        if (annoState.tool === 'pointer') canvas.classList.remove('drawing-mode'); 
+        else canvas.classList.add('drawing-mode'); 
+      }));
+      
+      $('#btnAnnoStyle').addEventListener('click', (e) => { e.stopPropagation(); $('#stylePopup').classList.toggle('active'); });
+      document.addEventListener('click', (e) => { if (!e.target.closest('#stylePopup') && !e.target.closest('#btnAnnoStyle')) $('#stylePopup').classList.remove('active'); });
+      
+      $$('.color-btn').forEach(b => b.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        annoState.color = b.dataset.color; 
+        $$('.color-btn').forEach(x => x.classList.remove('active')); 
+        b.classList.add('active'); 
+        $('#currentStylePreview').style.backgroundColor = annoState.color; 
+      }));
+      
+      $$('.stroke-dot').forEach(b => b.addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        annoState.strokeWidth = parseInt(b.dataset.width); 
+        $$('.stroke-dot').forEach(x => x.classList.remove('active')); 
+        b.classList.add('active'); 
+      }));
+      
+      $('#btnUndo').addEventListener('click', (e) => { e.stopPropagation(); undo(); });
+      $('#btnClearAnno').addEventListener('click', (e) => { e.stopPropagation(); saveToHistory(); ctx.clearRect(0, 0, canvas.width, canvas.height); });
+      $('#btnCloseToolbar').addEventListener('click', (e) => { e.stopPropagation(); annoState.toolbarVisible = false; toolbar.classList.remove('visible'); });
+      $('#btnToggleAnno').addEventListener('click', (e) => { e.stopPropagation(); annoState.toolbarVisible = !annoState.toolbarVisible; toolbar.classList.toggle('visible', annoState.toolbarVisible); });
+
+      async function toggleFullscreen() { const el = $('#previewWrap'); try { if (!document.fullscreenElement) await el.requestFullscreen(); else await document.exitFullscreen(); } catch (_) {} }
+      
+      function onFullscreenChange() { 
+        isFullscreen = !!document.fullscreenElement; 
+        $('#fsControls').classList.toggle('visible', isFullscreen); 
+        toolbar.classList.toggle('visible', isFullscreen && annoState.toolbarVisible); 
+        canvas.classList.toggle('fullscreen-active', isFullscreen); 
+        if (isFullscreen) { 
+          annoState.tool = 'pointer'; 
+          $$('[data-tool]').forEach(b => b.classList.remove('active')); 
+          $('[data-tool="pointer"]').classList.add('active'); 
+          canvas.classList.remove('drawing-mode'); 
+          setTimeout(() => { resizeCanvas(); deck && deck.layout(); }, 100); 
+        } else { 
+          annoState.paths = []; 
+          ctx.clearRect(0, 0, canvas.width, canvas.height); 
+          $('#stylePopup').classList.remove('active'); 
+        } 
+      }
+      
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+      $('#btnFullscreen').onclick = toggleFullscreen;
+      $('#btnExitFs').onclick = () => document.exitFullscreen().catch(()=>{});
+
+      // Help Modal
+      function openHelp() { $('#helpModal').setAttribute('aria-hidden', 'false'); }
+      function closeHelp() { $('#helpModal').setAttribute('aria-hidden', 'true'); }
+      $('#btnHelp').onclick = openHelp;
+      $('#btnCloseHelp').onclick = closeHelp;
+      $('#helpModalBg').onclick = closeHelp;
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeHelp(); closeRenameModal(); } });
+      
+      // 首次访问时自动打开帮助
+      if (settings.firstVisit) {
+        setTimeout(() => {
+          openHelp();
+          settings.firstVisit = false;
           saveWorkspace();
-          renderFileTree();
-          loadFile(id);
-          toast(`已导入：${file.name}`);
-        };
-        reader.readAsText(file, 'utf-8');
+        }, 500);
       }
-
-      $('#btnExport').addEventListener('click', exportMd);
       
-      $('#btnImport').addEventListener('click', () => {
-        $('#fileInput').value = '';
-        $('#fileInput').click();
-      });
-      
-      $('#fileInput').addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) importFile(file);
-      });
-
-      // Fullscreen
-      async function toggleFullscreen() {
-        const el = $('#previewWrap');
-        try {
-          if (!document.fullscreenElement) {
-            await el.requestFullscreen();
-          } else {
-            await document.exitFullscreen();
-          }
-        } catch (_) {
-          toast('全屏失败');
+      // 内容超出检测 - 基于 Markdown 内容的启发式检测
+      function checkSlideOverflow() {
+        if (!settings.overflowWarn || !deck) return;
+        
+        // 获取当前幻灯片的 Markdown 内容
+        const md = cm.getValue();
+        const idx = getSlideIndexFromCursor();
+        
+        // 分割获取当前幻灯片内容
+        const hSlides = md.split(/\n---\n/);
+        if (idx.h >= hSlides.length) return;
+        
+        const vSlides = hSlides[idx.h].split(/\n--\n/);
+        if (idx.v >= vSlides.length) return;
+        
+        const slideContent = vSlides[idx.v] || '';
+        
+        // 启发式检测 - 更敏感的阈值
+        const lines = slideContent.split('\n');
+        const nonEmptyLines = lines.filter(l => l.trim().length > 0).length;
+        const totalChars = slideContent.length;
+        const hasLargeCodeBlock = /```[\s\S]{300,}```/.test(slideContent);
+        const listItems = (slideContent.match(/^[\s]*[-*+]\s/gm) || []).length;
+        const hasHeading = /^#{1,3}\s/.test(slideContent);
+        
+        // 根据内容类型调整阈值
+        // 如果有标题，可用空间更少
+        const lineThreshold = hasHeading ? 12 : 15;
+        const charThreshold = hasHeading ? 600 : 800;
+        const listThreshold = hasHeading ? 8 : 10;
+        
+        // 检测是否超出
+        let overflow = false;
+        if (nonEmptyLines > lineThreshold) overflow = true;
+        if (totalChars > charThreshold) overflow = true;
+        if (hasLargeCodeBlock) overflow = true;
+        if (listItems > listThreshold) overflow = true;
+        
+        if (overflow) {
+          toast('⚠️ 当前页内容较多，建议使用 -- 拆分为子页面');
         }
-        setTimeout(() => deck && deck.layout(), 150);
       }
-      $('#btnFullscreen').addEventListener('click', toggleFullscreen);
 
-      // Help modal
-      function openHelp() {
-        $('#helpModal').setAttribute('aria-hidden', 'false');
-      }
-      function closeHelp() {
-        $('#helpModal').setAttribute('aria-hidden', 'true');
-      }
-      $('#btnHelp').addEventListener('click', openHelp);
-      $('#helpModal').addEventListener('click', (e) => {
-        if (e.target && e.target.dataset && e.target.dataset.close === 'true') closeHelp();
-      });
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          closeHelp();
-          closeRenameModal();
-        }
-      });
-
-      // Drag & drop
       const editorPanel = $('#editorPanel');
-      editorPanel.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-      });
-      editorPanel.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const file = e.dataTransfer.files && e.dataTransfer.files[0];
-        if (file) importFile(file);
-      });
-
-      // Warn on leave
-      window.addEventListener('beforeunload', (e) => {
-        if (!dirty) return;
-        if (settings.autoSave) return;
-        e.preventDefault();
-        e.returnValue = '';
-      });
-
-      // Resize
-      window.addEventListener('resize', debounce(() => {
-        if (deck) deck.layout();
-        if (cm) cm.refresh();
-      }, 120));
-
-      $('#previewWrap').addEventListener('pointerdown', () => {
-        $('#previewWrap').focus?.();
-      });
-
-      // Initial autosave
-      if (settings.autoSave) {
-        saveCurrentFile({ silent: true });
-      }
+      editorPanel.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+      editorPanel.addEventListener('drop', (e) => { e.preventDefault(); if(e.dataTransfer.files[0]) { const file = e.dataTransfer.files[0]; const reader = new FileReader(); reader.onload = () => { const parentId = getTargetParentId(); const id = generateId(); workspace.files[id] = { name: file.name, content: reader.result, parentId, type: 'file' }; saveWorkspace(); renderFileTree(); loadFile(id); toast('已导入'); }; reader.readAsText(file); } });
+      window.addEventListener('beforeunload', (e) => { if(dirty && !settings.autoSave) { e.preventDefault(); e.returnValue = ''; } });
+      window.addEventListener('resize', debounce(() => { if(deck) deck.layout(); if(cm) cm.refresh(); if(isFullscreen) resizeCanvas(); }, 120));
+      $('#previewWrap').addEventListener('pointerdown', () => $('#previewWrap').focus?.());
+      if(settings.autoSave) saveCurrentFile({silent:true});
     })();
   </script>
 </body>
