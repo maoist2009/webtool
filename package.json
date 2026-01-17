@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "vite": "^5.3.1",
-    "vite-plugin-pwa": "^0.20.0"
+    "vite-plugin-pwa": "^0.20.0",
+    "vite-plugin-sitemap": "^0.8.2"
   }
 }

@@ -1,5 +1,6 @@
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import Sitemap from 'vite-plugin-sitemap';
 
 export default defineConfig({
     base: '/',
@@ -28,6 +29,9 @@ export default defineConfig({
                     },
                 ],
             },
-        })
+        }),
+        Sitemap({
+            hostname: 'https://webtool-7s6.pages.dev/', // 替换为您的站点 URL
+        }),
     ],
 });
