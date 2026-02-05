@@ -27,12 +27,13 @@
         .upload-zone:hover, .upload-zone.dragover { background: rgba(79,195,247,0.1); }
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; margin-bottom: 6px; color: #b0bec5; font-size: 14px; }
-        .form-group input[type="text"], .form-group input[type="number"] {
+        .form-group input[type="text"], .form-group input[type="number"], .form-group input[type="password"] {
             width: 100%; padding: 12px; border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.2);
             background: rgba(0,0,0,0.3); color: #fff; font-size: 14px;
         }
         .form-group input:focus { outline: none; border-color: #4fc3f7; }
+        .form-group input[type="file"] { padding: 8px; }
         .row { display: flex; gap: 16px; }
         .row .form-group { flex: 1; }
         .btn {
@@ -77,59 +78,42 @@
             border-radius: 8px; display: none; z-index: 1000;
         }
         .toast.show { display: block; }
-        
-        /* 修复的开关样式 */
         .switch-row {
             display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
             padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;
         }
         .switch-row .switch-label { flex: 1; color: #b0bec5; font-size: 14px; }
         .help-text { font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4; }
-        
         .switch {
-            position: relative;
-            display: inline-block;
-            width: 52px;
-            height: 28px;
-            flex-shrink: 0;
+            position: relative; display: inline-block;
+            width: 52px; height: 28px; flex-shrink: 0;
         }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #555;
-            border-radius: 28px;
-            transition: 0.3s;
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; border-radius: 28px; transition: 0.3s;
         }
         .slider:before {
-            position: absolute;
-            content: "";
-            height: 22px;
-            width: 22px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            border-radius: 50%;
-            transition: 0.3s;
+            position: absolute; content: ""; height: 22px; width: 22px;
+            left: 3px; bottom: 3px; background-color: white;
+            border-radius: 50%; transition: 0.3s;
         }
-        input:checked + .slider {
-            background-color: #4fc3f7;
+        input:checked + .slider { background-color: #4fc3f7; }
+        input:checked + .slider:before { transform: translateX(24px); }
+        .signing-section {
+            background: rgba(0,0,0,0.2); border-radius: 12px;
+            padding: 16px; margin-bottom: 16px;
         }
-        input:checked + .slider:before {
-            transform: translateX(24px);
+        .signing-section h3 { color: #81d4fa; margin-bottom: 12px; font-size: 15px; }
+        .seed-display {
+            background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;
+            font-family: monospace; font-size: 12px; color: #ffa726;
+            word-break: break-all; margin-top: 8px;
         }
-        
+        .jks-options { display: none; margin-top: 12px; }
+        .jks-options.show { display: block; }
         @media (max-width: 600px) {
             .row { flex-direction: column; gap: 0; }
-            .switch-row { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -206,18 +190,66 @@
             <div class="switch-row">
                 <div class="switch-label">
                     🔐 Rename Custom Permissions & Authorities
-                    <div class="help-text">
-                        When package name changes:<br>
-                        • Custom permissions containing old package → replaced with new package<br>
-                        • Other custom permissions → add _aee suffix<br>
-                        • Authorities → similar logic<br>
-                        • System permissions (android.permission.*) are NOT modified
-                    </div>
+                    <div class="help-text">System permissions (android.permission.*) are NOT modified</div>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="renamePermissions">
                     <span class="slider"></span>
                 </label>
+            </div>
+
+            <!-- Signing Section -->
+            <div class="signing-section">
+                <h3>🔑 Signing Configuration</h3>
+                
+                <div class="form-group">
+                    <label>Signing Mode</label>
+                    <div class="option-group">
+                        <button class="option-btn active" data-mode="derived" data-target="signing">Derived from Seed</button>
+                        <button class="option-btn" data-mode="custom" data-target="signing">Custom Seed</button>
+                        <button class="option-btn" data-mode="jks" data-target="signing">Upload JKS/P12</button>
+                    </div>
+                </div>
+
+                <div id="signingDerived">
+                    <div class="form-group">
+                        <label>Master Signing Key</label>
+                        <input type="text" id="masterSigningKey" value="apk-editor-master-2024" placeholder="Master key for deriving signatures">
+                        <div class="help-text">Same master key + same package = same signature</div>
+                    </div>
+                    <div class="seed-display">
+                        Signing Seed: <span id="derivedSigningSeed">-</span>
+                    </div>
+                </div>
+
+                <div id="signingCustom" style="display:none">
+                    <div class="form-group">
+                        <label>Custom Signing Seed</label>
+                        <input type="text" id="customSigningSeed" placeholder="Enter custom signing seed">
+                        <div class="help-text">Use same seed for apps that need sharedUserId</div>
+                    </div>
+                </div>
+
+                <div id="signingJks" class="jks-options">
+                    <div class="form-group">
+                        <label>JKS/P12/KeyStore File</label>
+                        <input type="file" id="jksFile" accept=".jks,.keystore,.p12,.pfx">
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Store Password</label>
+                            <input type="password" id="storePassword" placeholder="Keystore password">
+                        </div>
+                        <div class="form-group">
+                            <label>Key Alias</label>
+                            <input type="text" id="keyAlias" placeholder="Key alias">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Key Password</label>
+                        <input type="password" id="keyPassword" placeholder="Key password (if different)">
+                    </div>
+                </div>
             </div>
 
             <button class="btn btn-primary" id="repackBtn" style="width:100%;margin-top:16px">
@@ -261,6 +293,7 @@ const setProgress = (p, t) => {
     $('progressText').textContent = t;
 };
 
+// ========== Seeded Random ==========
 class SeededRandom {
     constructor(seed) {
         this.s = 0;
@@ -270,6 +303,11 @@ class SeededRandom {
     next() { this.s = (this.s * 1103515245 + 12345) & 0x7fffffff; return this.s / 0x7fffffff; }
     int(a, b) { return Math.floor(this.next() * (b - a + 1)) + a; }
     pick(arr) { return arr[this.int(0, arr.length - 1)]; }
+    bytes(n) {
+        const arr = new Uint8Array(n);
+        for (let i = 0; i < n; i++) arr[i] = this.int(0, 255);
+        return arr;
+    }
 }
 
 const derivePackage = (orig, seed) => {
@@ -281,22 +319,27 @@ const deriveName = seed => {
     return `${r.pick(['Super','Ultra','Pro','Fast'])} ${r.pick(['App','Tool','Helper'])}`;
 };
 
-// ========== System Permissions List ==========
-// 系统权限前缀 - 这些权限绝对不能修改
-const SYSTEM_PERMISSION_PREFIXES = [
-    'android.permission.',
-    'android.permission.BIND_',
-    'com.android.',
-    'com.google.android.',
-];
-
-function isSystemPermission(permName) {
-    for (const prefix of SYSTEM_PERMISSION_PREFIXES) {
-        if (permName.startsWith(prefix)) {
-            return true;
-        }
+// Derive signing seed from master key + package
+function deriveSigningSeed(masterKey, packageName) {
+    const combined = `${masterKey}:${packageName}:signing`;
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+        hash = ((hash << 5) - hash + combined.charCodeAt(i)) | 0;
     }
-    return false;
+    // Create a readable seed
+    const r = new SeededRandom(combined);
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let seed = '';
+    for (let i = 0; i < 32; i++) {
+        seed += chars[r.int(0, chars.length - 1)];
+    }
+    return seed;
+}
+
+// ========== System Permissions ==========
+const SYSTEM_PERMISSION_PREFIXES = ['android.permission.', 'com.android.', 'com.google.android.'];
+function isSystemPermission(permName) {
+    return SYSTEM_PERMISSION_PREFIXES.some(p => permName.startsWith(p));
 }
 
 // ========== ZIP Reader ==========
@@ -374,14 +417,7 @@ class ZipWriter {
     addFile(name, data, options = {}) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
         const { compress = true, alignment = 0 } = options;
-        
-        this.files.push({
-            name,
-            data: bytes,
-            compress: compress && alignment === 0,
-            alignment,
-            crc: this.crc32(bytes)
-        });
+        this.files.push({ name, data: bytes, compress: compress && alignment === 0, alignment, crc: this.crc32(bytes) });
     }
     
     async build() {
@@ -398,10 +434,7 @@ class ZipWriter {
                 try {
                     const cs = new CompressionStream('deflate-raw');
                     const result = await new Response(new Blob([file.data]).stream().pipeThrough(cs)).arrayBuffer();
-                    if (result.byteLength < file.data.length * 0.9) {
-                        compData = new Uint8Array(result);
-                        method = 8;
-                    }
+                    if (result.byteLength < file.data.length * 0.9) { compData = new Uint8Array(result); method = 8; }
                 } catch (e) {}
             }
             
@@ -409,16 +442,13 @@ class ZipWriter {
             if (file.alignment > 0 && method === 0) {
                 const headerAndName = offset + 30 + nameBytes.length;
                 const misalignment = headerAndName % file.alignment;
-                if (misalignment !== 0) {
-                    extraSize = file.alignment - misalignment;
-                }
+                if (misalignment !== 0) extraSize = file.alignment - misalignment;
             }
             
             const local = new Uint8Array(30);
             const lv = new DataView(local.buffer);
             lv.setUint32(0, 0x04034B50, true);
             lv.setUint16(4, 20, true);
-            lv.setUint16(6, 0, true);
             lv.setUint16(8, method, true);
             lv.setUint16(10, 0x0821, true);
             lv.setUint16(12, 0x0021, true);
@@ -428,8 +458,7 @@ class ZipWriter {
             lv.setUint16(26, nameBytes.length, true);
             lv.setUint16(28, extraSize, true);
             
-            chunks.push(local);
-            chunks.push(nameBytes);
+            chunks.push(local, nameBytes);
             if (extraSize > 0) chunks.push(new Uint8Array(extraSize));
             chunks.push(compData);
             
@@ -441,7 +470,6 @@ class ZipWriter {
             cv.setUint32(0, 0x02014B50, true);
             cv.setUint16(4, 0x0314, true);
             cv.setUint16(6, 20, true);
-            cv.setUint16(8, 0, true);
             cv.setUint16(10, method, true);
             cv.setUint16(12, 0x0821, true);
             cv.setUint16(14, 0x0021, true);
@@ -449,15 +477,9 @@ class ZipWriter {
             cv.setUint32(20, compData.length, true);
             cv.setUint32(24, file.data.length, true);
             cv.setUint16(28, nameBytes.length, true);
-            cv.setUint16(30, 0, true);
-            cv.setUint16(32, 0, true);
-            cv.setUint16(34, 0, true);
-            cv.setUint16(36, 0, true);
-            cv.setUint32(38, 0, true);
             cv.setUint32(42, fileOffset, true);
             
-            cdEntries.push(cd);
-            cdEntries.push(nameBytes);
+            cdEntries.push(cd, nameBytes);
         }
         
         const cdOffset = offset;
@@ -499,29 +521,21 @@ class AXMLParser {
     readI32(offset) { return this.view.getInt32(offset, true); }
     
     parse() {
-        const magic = this.readU32(0);
-        if (magic !== 0x00080003) throw new Error('Invalid AXML magic');
-        
+        if (this.readU32(0) !== 0x00080003) throw new Error('Invalid AXML magic');
         let pos = 8;
         while (pos + 8 <= this.data.length) {
             const chunkType = this.readU16(pos);
             const headerSize = this.readU16(pos + 2);
             const chunkSize = this.readU32(pos + 4);
-            
             if (chunkSize < 8 || pos + chunkSize > this.data.length) break;
-            
-            switch (chunkType) {
-                case 0x0001: this.parseStringPool(pos, chunkSize); break;
-                case 0x0102: this.parseStartElement(pos, headerSize); break;
-            }
-            
+            if (chunkType === 0x0001) this.parseStringPool(pos, chunkSize);
+            else if (chunkType === 0x0102) this.parseStartElement(pos, headerSize);
             pos += chunkSize;
         }
     }
     
     parseStringPool(start, size) {
         this.stringPoolSize = size;
-        
         const stringCount = this.readU32(start + 8);
         const flags = this.readU32(start + 16);
         const stringsStart = this.readU32(start + 20);
@@ -529,15 +543,12 @@ class AXMLParser {
         this.isUtf8 = isUtf8;
         
         const offsets = [];
-        for (let i = 0; i < stringCount; i++) {
-            offsets.push(this.readU32(start + 28 + i * 4));
-        }
+        for (let i = 0; i < stringCount; i++) offsets.push(this.readU32(start + 28 + i * 4));
         
         const stringsDataStart = start + stringsStart;
         for (let i = 0; i < stringCount; i++) {
             const strOffset = stringsDataStart + offsets[i];
             let str = '';
-            
             try {
                 if (isUtf8) {
                     let p = strOffset;
@@ -550,10 +561,6 @@ class AXMLParser {
                     let p = strOffset;
                     let len = this.data[p] | (this.data[p + 1] << 8);
                     p += 2;
-                    if (len & 0x8000) {
-                        len = ((len & 0x7FFF) << 16) | (this.data[p] | (this.data[p + 1] << 8));
-                        p += 2;
-                    }
                     const chars = [];
                     for (let j = 0; j < len; j++) {
                         const c = this.data[p] | (this.data[p + 1] << 8);
@@ -564,11 +571,8 @@ class AXMLParser {
                     str = chars.join('');
                 }
             } catch (e) {}
-            
             this.strings.push(str);
         }
-        
-        log(`Parsed ${this.strings.length} strings (UTF-8: ${isUtf8})`, 'info');
     }
     
     parseStartElement(start, headerSize) {
@@ -576,20 +580,17 @@ class AXMLParser {
         const attrStart = this.readU16(start + 24);
         const attrSize = this.readU16(start + 26);
         const attrCount = this.readU16(start + 28);
-        
-        const elemName = (nameIdx >= 0 && nameIdx < this.strings.length) ? this.strings[nameIdx] : '';
+        const elemName = this.strings[nameIdx] || '';
         const attrsOffset = start + 16 + attrStart;
         
         for (let i = 0; i < attrCount; i++) {
             const attrOffset = attrsOffset + i * attrSize;
             if (attrOffset + 20 > this.data.length) break;
-            
             const attrNameIdx = this.readI32(attrOffset + 4);
             const rawValue = this.readI32(attrOffset + 8);
             const dataType = this.data[attrOffset + 15];
             const data = this.readI32(attrOffset + 16);
-            
-            const attrName = (attrNameIdx >= 0 && attrNameIdx < this.strings.length) ? this.strings[attrNameIdx] : '';
+            const attrName = this.strings[attrNameIdx] || '';
             
             if (elemName === 'manifest') {
                 if (attrName === 'package' && dataType === 0x03) {
@@ -598,39 +599,25 @@ class AXMLParser {
                 }
                 if (attrName === 'versionCode') this.info.versionCode = data;
                 if (attrName === 'versionName') {
-                    if (dataType === 0x03 && rawValue >= 0) {
-                        this.info.versionName = this.strings[rawValue] || '';
-                        this.info.versionNameStringIdx = rawValue;
-                    } else {
-                        this.info.versionName = String(data);
-                    }
+                    if (dataType === 0x03) { this.info.versionName = this.strings[rawValue] || ''; this.info.versionNameStringIdx = rawValue; }
+                    else this.info.versionName = String(data);
                 }
             } else if (elemName === 'uses-sdk') {
                 if (attrName === 'minSdkVersion') this.info.minSdk = data;
                 if (attrName === 'targetSdkVersion') this.info.targetSdk = data;
             } else if (elemName === 'application') {
                 if (attrName === 'label') {
-                    if (dataType === 0x03 && rawValue >= 0) {
-                        this.info.label = this.strings[rawValue] || '';
-                        this.info.labelStringIdx = rawValue;
-                    } else if (dataType === 0x01) {
-                        this.info.label = `@0x${(data >>> 0).toString(16)}`;
-                    }
+                    if (dataType === 0x03) { this.info.label = this.strings[rawValue] || ''; this.info.labelStringIdx = rawValue; }
+                    else if (dataType === 0x01) this.info.label = `@0x${(data >>> 0).toString(16)}`;
                 }
             } else if (elemName === 'permission' || elemName === 'uses-permission') {
                 if (attrName === 'name' && dataType === 0x03 && rawValue >= 0) {
-                    const permName = this.strings[rawValue] || '';
-                    this.permissions.push({ 
-                        stringIdx: rawValue, 
-                        value: permName,
-                        isSystem: isSystemPermission(permName),
-                        element: elemName
-                    });
+                    const val = this.strings[rawValue] || '';
+                    this.permissions.push({ stringIdx: rawValue, value: val, isSystem: isSystemPermission(val) });
                 }
             } else if (elemName === 'provider') {
                 if (attrName === 'authorities' && dataType === 0x03 && rawValue >= 0) {
-                    const authValue = this.strings[rawValue] || '';
-                    this.authorities.push({ stringIdx: rawValue, value: authValue });
+                    this.authorities.push({ stringIdx: rawValue, value: this.strings[rawValue] || '' });
                 }
             }
         }
@@ -656,29 +643,22 @@ class AXMLModifier {
         
         const strings = [];
         const strDataStart = 8 + stringsStart;
-        
         for (let i = 0; i < stringCount; i++) {
             const offset = this.readU32(36 + i * 4);
             const strPos = strDataStart + offset;
             let str = '';
-            
             try {
                 if (isUtf8) {
-                    let p = strPos;
-                    let cLen = this.data[p++];
+                    let p = strPos, cLen = this.data[p++];
                     if (cLen & 0x80) p++;
                     let bLen = this.data[p++];
                     if (bLen & 0x80) bLen = ((bLen & 0x7F) << 8) | this.data[p++];
                     str = new TextDecoder('utf-8').decode(this.data.subarray(p, p + bLen));
                 } else {
-                    let p = strPos;
-                    let len = this.data[p] | (this.data[p + 1] << 8);
+                    let p = strPos, len = this.data[p] | (this.data[p + 1] << 8);
                     p += 2;
                     const chars = [];
-                    for (let j = 0; j < len; j++) {
-                        chars.push(String.fromCharCode(this.data[p] | (this.data[p + 1] << 8)));
-                        p += 2;
-                    }
+                    for (let j = 0; j < len; j++) { chars.push(String.fromCharCode(this.data[p] | (this.data[p + 1] << 8))); p += 2; }
                     str = chars.join('');
                 }
             } catch (e) {}
@@ -686,32 +666,18 @@ class AXMLModifier {
         }
         
         const changeMap = new Map();
-        for (const c of changes) {
-            if (c.idx !== undefined && c.idx >= 0 && c.idx < strings.length) {
-                changeMap.set(c.idx, c.val);
-            }
-        }
-        
-        for (const [idx, val] of changeMap) {
-            if (strings[idx] !== val) {
-                log(`String[${idx}]: "${strings[idx].slice(0, 40)}" → "${val.slice(0, 40)}"`, 'info');
-                strings[idx] = val;
-            }
-        }
+        for (const c of changes) if (c.idx !== undefined && c.idx >= 0 && c.idx < strings.length) changeMap.set(c.idx, c.val);
+        for (const [idx, val] of changeMap) if (strings[idx] !== val) { log(`String[${idx}]: "${strings[idx].slice(0,40)}" → "${val.slice(0,40)}"`, 'info'); strings[idx] = val; }
         
         return this.rebuildWithStrings(strings, isUtf8, 8 + spSize);
     }
     
     rebuildWithStrings(strings, isUtf8, afterStringPool) {
         const restData = this.data.subarray(afterStringPool);
-        
-        const stringBytes = [];
-        const offsets = [];
+        const stringBytes = [], offsets = [];
         let currentOffset = 0;
-        
         for (const str of strings) {
             offsets.push(currentOffset);
-            
             if (isUtf8) {
                 const encoded = new TextEncoder().encode(str);
                 const entry = [];
@@ -724,18 +690,14 @@ class AXMLModifier {
                 currentOffset += entry.length;
             } else {
                 const entry = [str.length & 0xFF, (str.length >> 8) & 0x7F];
-                for (const char of str) {
-                    const code = char.charCodeAt(0);
-                    entry.push(code & 0xFF, (code >> 8) & 0xFF);
-                }
+                for (const char of str) { const code = char.charCodeAt(0); entry.push(code & 0xFF, (code >> 8) & 0xFF); }
                 entry.push(0, 0);
                 stringBytes.push(new Uint8Array(entry));
                 currentOffset += entry.length;
             }
         }
         
-        const headerSize = 28;
-        const offsetsSize = strings.length * 4;
+        const headerSize = 28, offsetsSize = strings.length * 4;
         const stringsSize = stringBytes.reduce((a, b) => a + b.length, 0);
         const padding = (4 - (stringsSize % 4)) % 4;
         const newSpSize = headerSize + offsetsSize + stringsSize + padding;
@@ -746,60 +708,37 @@ class AXMLModifier {
         spView.setUint16(2, 28, true);
         spView.setUint32(4, newSpSize, true);
         spView.setUint32(8, strings.length, true);
-        spView.setUint32(12, 0, true);
         spView.setUint32(16, isUtf8 ? 0x100 : 0, true);
         spView.setUint32(20, headerSize + offsetsSize, true);
-        spView.setUint32(24, 0, true);
         
-        for (let i = 0; i < offsets.length; i++) {
-            spView.setUint32(28 + i * 4, offsets[i], true);
-        }
-        
+        for (let i = 0; i < offsets.length; i++) spView.setUint32(28 + i * 4, offsets[i], true);
         let writePos = headerSize + offsetsSize;
-        for (const bytes of stringBytes) {
-            newSp.set(bytes, writePos);
-            writePos += bytes.length;
-        }
+        for (const bytes of stringBytes) { newSp.set(bytes, writePos); writePos += bytes.length; }
         
-        const newFileSize = 8 + newSpSize + restData.length;
-        const result = new Uint8Array(newFileSize);
-        const rv = new DataView(result.buffer);
-        rv.setUint32(0, 0x00080003, true);
-        rv.setUint32(4, newFileSize, true);
+        const result = new Uint8Array(8 + newSpSize + restData.length);
+        new DataView(result.buffer).setUint32(0, 0x00080003, true);
+        new DataView(result.buffer).setUint32(4, result.length, true);
         result.set(newSp, 8);
         result.set(restData, 8 + newSpSize);
-        
         return result;
     }
     
     modifyIntAttr(elemName, attrName, newValue) {
         const parser = new AXMLParser(this.data);
         const strings = parser.strings;
-        
         let pos = 8 + parser.stringPoolSize;
-        if (pos + 8 <= this.data.length && this.readU16(pos) === 0x0180) {
-            pos += this.readU32(pos + 4);
-        }
-        
+        if (pos + 8 <= this.data.length && this.readU16(pos) === 0x0180) pos += this.readU32(pos + 4);
         while (pos + 8 <= this.data.length) {
-            const chunkType = this.readU16(pos);
-            const headerSize = this.readU16(pos + 2);
-            const chunkSize = this.readU32(pos + 4);
-            
+            const chunkType = this.readU16(pos), headerSize = this.readU16(pos + 2), chunkSize = this.readU32(pos + 4);
             if (chunkSize < 8 || pos + chunkSize > this.data.length) break;
-            
             if (chunkType === 0x0102) {
                 const nameIdx = this.view.getInt32(pos + 20, true);
-                const attrStart = this.readU16(pos + 24);
-                const attrSize = this.readU16(pos + 26);
-                const attrCount = this.readU16(pos + 28);
-                
+                const attrStart = this.readU16(pos + 24), attrSize = this.readU16(pos + 26), attrCount = this.readU16(pos + 28);
                 if (strings[nameIdx] === elemName) {
                     const attrsOffset = pos + 16 + attrStart;
                     for (let i = 0; i < attrCount; i++) {
                         const attrOffset = attrsOffset + i * attrSize;
-                        const attrNameIdx = this.view.getInt32(attrOffset + 4, true);
-                        if (strings[attrNameIdx] === attrName) {
+                        if (strings[this.view.getInt32(attrOffset + 4, true)] === attrName) {
                             this.view.setInt32(attrOffset + 16, newValue, true);
                             log(`Modified ${elemName}/@${attrName} = ${newValue}`, 'info');
                             return;
@@ -808,6 +747,315 @@ class AXMLModifier {
                 }
             }
             pos += chunkSize;
+        }
+    }
+}
+
+// ========== Deterministic RSA Key Generation ==========
+class DeterministicRSA {
+    constructor(seed) {
+        this.rng = new SeededRandom(seed);
+    }
+    
+    // Miller-Rabin primality test
+    isProbablePrime(n, k = 10) {
+        if (n < 2n) return false;
+        if (n === 2n || n === 3n) return true;
+        if (n % 2n === 0n) return false;
+        
+        let r = 0n, d = n - 1n;
+        while (d % 2n === 0n) { d /= 2n; r++; }
+        
+        for (let i = 0; i < k; i++) {
+            const a = this.randomBigInt(2n, n - 2n);
+            let x = this.modPow(a, d, n);
+            if (x === 1n || x === n - 1n) continue;
+            let composite = true;
+            for (let j = 0n; j < r - 1n; j++) {
+                x = this.modPow(x, 2n, n);
+                if (x === n - 1n) { composite = false; break; }
+            }
+            if (composite) return false;
+        }
+        return true;
+    }
+    
+    modPow(base, exp, mod) {
+        let result = 1n;
+        base = base % mod;
+        while (exp > 0n) {
+            if (exp % 2n === 1n) result = (result * base) % mod;
+            exp = exp / 2n;
+            base = (base * base) % mod;
+        }
+        return result;
+    }
+    
+    randomBigInt(min, max) {
+        const range = max - min + 1n;
+        const bits = range.toString(2).length;
+        const bytes = Math.ceil(bits / 8);
+        let result;
+        do {
+            const arr = this.rng.bytes(bytes);
+            result = BigInt('0x' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join(''));
+        } while (result >= range);
+        return min + result;
+    }
+    
+    generatePrime(bits) {
+        const bytes = Math.ceil(bits / 8);
+        while (true) {
+            const arr = this.rng.bytes(bytes);
+            arr[0] |= 0x80; // Ensure high bit set
+            arr[bytes - 1] |= 0x01; // Ensure odd
+            let n = BigInt('0x' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join(''));
+            // Trim to exact bits
+            const mask = (1n << BigInt(bits)) - 1n;
+            n = n & mask;
+            n |= (1n << BigInt(bits - 1)); // Ensure high bit
+            n |= 1n; // Ensure odd
+            if (this.isProbablePrime(n)) return n;
+        }
+    }
+    
+    modInverse(a, m) {
+        let [old_r, r] = [a, m];
+        let [old_s, s] = [1n, 0n];
+        while (r !== 0n) {
+            const q = old_r / r;
+            [old_r, r] = [r, old_r - q * r];
+            [old_s, s] = [s, old_s - q * s];
+        }
+        if (old_r !== 1n) throw new Error('No inverse');
+        return ((old_s % m) + m) % m;
+    }
+    
+    async generate() {
+        log('Generating deterministic RSA-2048 key pair...', 'info');
+        
+        const p = this.generatePrime(1024);
+        const q = this.generatePrime(1024);
+        const n = p * q;
+        const phi = (p - 1n) * (q - 1n);
+        const e = 65537n;
+        const d = this.modInverse(e, phi);
+        
+        // Build PKCS#1 private key structure for import
+        // We'll export as JWK for WebCrypto import
+        const nBytes = this.bigIntToBytes(n, 256);
+        const eBytes = this.bigIntToBytes(e, 3);
+        const dBytes = this.bigIntToBytes(d, 256);
+        const pBytes = this.bigIntToBytes(p, 128);
+        const qBytes = this.bigIntToBytes(q, 128);
+        const dpBytes = this.bigIntToBytes(d % (p - 1n), 128);
+        const dqBytes = this.bigIntToBytes(d % (q - 1n), 128);
+        const qiBytes = this.bigIntToBytes(this.modInverse(q, p), 128);
+        
+        const b64url = arr => btoa(String.fromCharCode(...arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        
+        const jwk = {
+            kty: 'RSA',
+            n: b64url(nBytes),
+            e: b64url(eBytes),
+            d: b64url(dBytes),
+            p: b64url(pBytes),
+            q: b64url(qBytes),
+            dp: b64url(dpBytes),
+            dq: b64url(dqBytes),
+            qi: b64url(qiBytes),
+            alg: 'RS256',
+            ext: true
+        };
+        
+        const privateKey = await crypto.subtle.importKey(
+            'jwk', jwk,
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            true, ['sign']
+        );
+        
+        const publicKey = await crypto.subtle.importKey(
+            'jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            true, ['verify']
+        );
+        
+        const publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
+        
+        log('Deterministic key pair generated', 'success');
+        return { privateKey, publicKey, publicKeyDer };
+    }
+    
+    bigIntToBytes(n, length) {
+        const hex = n.toString(16).padStart(length * 2, '0');
+        const bytes = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+            bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        }
+        return bytes;
+    }
+}
+
+// ========== JKS/P12 Parser ==========
+class KeystoreParser {
+    static async parseJKS(buffer, storePass, keyAlias, keyPass) {
+        const view = new DataView(buffer);
+        const magic = view.getUint32(0, false);
+        
+        if (magic === 0xFEEDFEED) {
+            return await this.parseJKSFormat(buffer, storePass, keyAlias, keyPass);
+        } else {
+            // Try PKCS12
+            return await this.parsePKCS12(buffer, storePass, keyAlias, keyPass);
+        }
+    }
+    
+    static async parseJKSFormat(buffer, storePass, keyAlias, keyPass) {
+        log('Parsing JKS format...', 'info');
+        const data = new Uint8Array(buffer);
+        const view = new DataView(buffer);
+        
+        // JKS Magic: 0xFEEDFEED
+        // Version: 4 bytes
+        // Entry count: 4 bytes
+        let pos = 8;
+        const entryCount = view.getInt32(pos, false);
+        pos += 4;
+        
+        log(`JKS contains ${entryCount} entries`, 'info');
+        
+        for (let i = 0; i < entryCount; i++) {
+            const tag = view.getInt32(pos, false);
+            pos += 4;
+            
+            const aliasLen = view.getInt16(pos, false);
+            pos += 2;
+            const alias = new TextDecoder().decode(data.subarray(pos, pos + aliasLen));
+            pos += aliasLen;
+            
+            // Timestamp (8 bytes)
+            pos += 8;
+            
+            if (tag === 1) { // Private key entry
+                if (alias.toLowerCase() === keyAlias.toLowerCase()) {
+                    log(`Found key alias: ${alias}`, 'success');
+                    
+                    // Encrypted private key length
+                    const keyLen = view.getInt32(pos, false);
+                    pos += 4;
+                    const encryptedKey = data.subarray(pos, pos + keyLen);
+                    pos += keyLen;
+                    
+                    // Certificate chain
+                    const certChainLen = view.getInt32(pos, false);
+                    pos += 4;
+                    
+                    const certs = [];
+                    for (let j = 0; j < certChainLen; j++) {
+                        const certTypeLen = view.getInt16(pos, false);
+                        pos += 2;
+                        pos += certTypeLen; // Skip cert type string
+                        
+                        const certLen = view.getInt32(pos, false);
+                        pos += 4;
+                        certs.push(data.subarray(pos, pos + certLen));
+                        pos += certLen;
+                    }
+                    
+                    // Decrypt the private key
+                    const decryptedKey = await this.decryptJKSPrivateKey(encryptedKey, keyPass || storePass);
+                    
+                    return {
+                        privateKeyDer: decryptedKey,
+                        certificateDer: certs[0],
+                        certificates: certs
+                    };
+                } else {
+                    // Skip this entry
+                    const keyLen = view.getInt32(pos, false);
+                    pos += 4 + keyLen;
+                    const certChainLen = view.getInt32(pos, false);
+                    pos += 4;
+                    for (let j = 0; j < certChainLen; j++) {
+                        const certTypeLen = view.getInt16(pos, false);
+                        pos += 2 + certTypeLen;
+                        const certLen = view.getInt32(pos, false);
+                        pos += 4 + certLen;
+                    }
+                }
+            } else if (tag === 2) { // Trusted cert
+                const certTypeLen = view.getInt16(pos, false);
+                pos += 2 + certTypeLen;
+                const certLen = view.getInt32(pos, false);
+                pos += 4 + certLen;
+            }
+        }
+        
+        throw new Error(`Key alias "${keyAlias}" not found in keystore`);
+    }
+    
+    static async decryptJKSPrivateKey(encrypted, password) {
+        // JKS uses a custom PBE scheme
+        // The key is encrypted using password-derived XOR stream
+        const passwordBytes = new TextEncoder().encode(password);
+        const salt = encrypted.subarray(0, 20);
+        const encData = encrypted.subarray(20, encrypted.length - 20);
+        const storedCheck = encrypted.subarray(encrypted.length - 20);
+        
+        // Generate keystream using SHA1
+        let xorKey = new Uint8Array(0);
+        let digest = new Uint8Array([...passwordBytes, ...new TextEncoder().encode('Mighty Aphrodite'), ...salt]);
+        
+        while (xorKey.length < encData.length) {
+            const hashBuffer = await crypto.subtle.digest('SHA-1', digest);
+            const hash = new Uint8Array(hashBuffer);
+            const newXorKey = new Uint8Array(xorKey.length + hash.length);
+            newXorKey.set(xorKey);
+            newXorKey.set(hash, xorKey.length);
+            xorKey = newXorKey;
+            digest = new Uint8Array([...passwordBytes, ...hash]);
+        }
+        
+        // XOR to decrypt
+        const decrypted = new Uint8Array(encData.length);
+        for (let i = 0; i < encData.length; i++) {
+            decrypted[i] = encData[i] ^ xorKey[i];
+        }
+        
+        // Verify checksum
+        const checkData = new Uint8Array([...passwordBytes, ...decrypted]);
+        const checkHash = new Uint8Array(await crypto.subtle.digest('SHA-1', checkData));
+        
+        let valid = true;
+        for (let i = 0; i < 20; i++) {
+            if (checkHash[i] !== storedCheck[i]) valid = false;
+        }
+        
+        if (!valid) {
+            throw new Error('Invalid key password or corrupted keystore');
+        }
+        
+        return decrypted;
+    }
+    
+    static async parsePKCS12(buffer, password, keyAlias, keyPass) {
+        log('PKCS12 parsing is complex; using WebCrypto workaround...', 'warn');
+        throw new Error('PKCS12 format requires server-side processing or a specialized library. Please use JKS format or generate a new key.');
+    }
+    
+    static async importPrivateKey(derBytes) {
+        // Parse PKCS#8 private key
+        try {
+            return await crypto.subtle.importKey(
+                'pkcs8',
+                derBytes,
+                { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+                true,
+                ['sign']
+            );
+        } catch (e) {
+            log(`Failed to import private key: ${e.message}`, 'error');
+            throw e;
         }
     }
 }
@@ -863,20 +1111,46 @@ class APKSigner {
         return this.concat(new Uint8Array([0x17, s.length]), new TextEncoder().encode(s));
     }
     
-    async generateKey(cn) {
-        log('Generating RSA-2048 key pair...', 'info');
+    async generateFromSeed(seed, cn) {
+        log(`Generating key from seed: ${seed.slice(0, 16)}...`, 'info');
         
-        const keyPair = await crypto.subtle.generateKey(
-            { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
-            true, ['sign', 'verify']
+        const rsa = new DeterministicRSA(seed);
+        const { privateKey, publicKey, publicKeyDer } = await rsa.generate();
+        
+        this.privateKey = privateKey;
+        this.publicKeyDer = publicKeyDer;
+        
+        // Create certificate
+        await this.createCertificate(cn, privateKey, publicKeyDer);
+    }
+    
+    async loadFromKeystore(keystoreBuffer, storePass, keyAlias, keyPass) {
+        log('Loading key from keystore...', 'info');
+        
+        const result = await KeystoreParser.parseJKS(keystoreBuffer, storePass, keyAlias, keyPass);
+        
+        this.privateKey = await KeystoreParser.importPrivateKey(result.privateKeyDer);
+        this.certificate = result.certificateDer;
+        
+        // Extract public key from certificate
+        // For simplicity, we'll regenerate it from the private key
+        const publicKeyJwk = await crypto.subtle.exportKey('jwk', this.privateKey);
+        const publicKey = await crypto.subtle.importKey(
+            'jwk',
+            { kty: publicKeyJwk.kty, n: publicKeyJwk.n, e: publicKeyJwk.e, alg: 'RS256', ext: true },
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            true, ['verify']
         );
+        this.publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
         
-        this.privateKey = keyPair.privateKey;
-        this.publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', keyPair.publicKey));
-        
+        log('Keystore loaded successfully', 'success');
+    }
+    
+    async createCertificate(cn, privateKey, publicKeyDer) {
         const now = new Date();
         const notAfter = new Date(now.getTime() + 25 * 365 * 24 * 60 * 60 * 1000);
-        const serial = crypto.getRandomValues(new Uint8Array(16));
+        const serial = new Uint8Array(16);
+        new SeededRandom(cn).bytes(16).forEach((v, i) => serial[i] = v);
         serial[0] &= 0x7F;
         
         const sha256Rsa = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
@@ -893,11 +1167,11 @@ class APKSigner {
             new Uint8Array([0xA0, 0x03, 0x02, 0x01, 0x02]),
             this.derInt(serial),
             sha256Rsa, issuer, validity, issuer,
-            this.publicKeyDer,
+            publicKeyDer,
             extensionsCtx
         );
         
-        const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', keyPair.privateKey, tbs));
+        const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, tbs));
         this.certificate = this.derSeq(tbs, sha256Rsa, this.derBits(signature));
         
         log(`Certificate generated: ${this.certificate.length} bytes`, 'success');
@@ -938,13 +1212,11 @@ class APKSigner {
             this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData)
         );
         
-        log(`V1: MF=${mf.length}, SF=${sf.length}, RSA=${pkcs7.length}`, 'info');
         return { mf, sf, rsa: pkcs7 };
     }
     
     async signV2(apkBytes) {
-        log('Creating V2 (APK Signature Scheme v2) signature...', 'info');
-        
+        log('Creating V2 signature...', 'info');
         const apk = apkBytes instanceof Uint8Array ? apkBytes : new Uint8Array(apkBytes);
         const view = new DataView(apk.buffer, apk.byteOffset, apk.byteLength);
         
@@ -959,11 +1231,8 @@ class APKSigner {
         const section3 = apk.slice(cdOffset, eocdOffset);
         const section4 = apk.slice(eocdOffset);
         
-        log(`Sections: entries=${section1.length}, CD=${section3.length}, EOCD=${section4.length}`, 'info');
-        
         const CHUNK_SIZE = 1024 * 1024;
         const chunkDigests = [];
-        
         const processChunks = async (data) => {
             for (let i = 0; i < data.length; i += CHUNK_SIZE) {
                 const chunk = data.slice(i, Math.min(i + CHUNK_SIZE, data.length));
@@ -974,158 +1243,111 @@ class APKSigner {
                 chunkDigests.push(new Uint8Array(await crypto.subtle.digest('SHA-256', prefixed)));
             }
         };
-        
         await processChunks(section1);
         await processChunks(section3);
         await processChunks(section4);
         
         const allDigests = new Uint8Array(chunkDigests.length * 32);
         chunkDigests.forEach((d, i) => allDigests.set(d, i * 32));
-        
         const topPrefix = new Uint8Array(5 + allDigests.length);
         topPrefix[0] = 0x5A;
         new DataView(topPrefix.buffer).setUint32(1, chunkDigests.length, true);
         topPrefix.set(allDigests, 5);
         const contentDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', topPrefix));
         
-        log(`Content digest: ${chunkDigests.length} chunks`, 'info');
+        const lp = (data) => { const r = new Uint8Array(4 + data.length); new DataView(r.buffer).setUint32(0, data.length, true); r.set(data, 4); return r; };
+        const u32 = (val) => { const r = new Uint8Array(4); new DataView(r.buffer).setUint32(0, val, true); return r; };
         
-        const lp = (data) => {
-            const result = new Uint8Array(4 + data.length);
-            new DataView(result.buffer).setUint32(0, data.length, true);
-            result.set(data, 4);
-            return result;
-        };
-        
-        const u32 = (val) => {
-            const result = new Uint8Array(4);
-            new DataView(result.buffer).setUint32(0, val, true);
-            return result;
-        };
-        
-        const SIGNATURE_ALGORITHM_ID = 0x0103;
-        
-        const digestEntry = this.concat(u32(SIGNATURE_ALGORITHM_ID), lp(contentDigest));
+        const digestEntry = this.concat(u32(0x0103), lp(contentDigest));
         const digests = lp(lp(digestEntry));
         const certificates = lp(lp(this.certificate));
-        const additionalAttrs = lp(new Uint8Array(0));
-        const signedDataContent = this.concat(digests, certificates, additionalAttrs);
+        const signedDataContent = this.concat(digests, certificates, lp(new Uint8Array(0)));
         
         const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, signedDataContent));
-        log(`Signature: ${signature.length} bytes`, 'info');
-        
-        const signatureEntry = this.concat(u32(SIGNATURE_ALGORITHM_ID), lp(signature));
-        const signatures = lp(lp(signatureEntry));
-        
-        const signer = this.concat(lp(signedDataContent), signatures, lp(this.publicKeyDer));
+        const signatureEntry = this.concat(u32(0x0103), lp(signature));
+        const signer = this.concat(lp(signedDataContent), lp(lp(signatureEntry)), lp(this.publicKeyDer));
         const signersValue = lp(lp(signer));
         
-        const V2_BLOCK_ID = 0x7109871A;
         const pairPayloadSize = 4 + signersValue.length;
         const pair = new Uint8Array(8 + 4 + signersValue.length);
-        const pairView = new DataView(pair.buffer);
-        pairView.setBigUint64(0, BigInt(pairPayloadSize), true);
-        pairView.setUint32(8, V2_BLOCK_ID, true);
+        new DataView(pair.buffer).setBigUint64(0, BigInt(pairPayloadSize), true);
+        new DataView(pair.buffer).setUint32(8, 0x7109871A, true);
         pair.set(signersValue, 12);
         
         const magic = new TextEncoder().encode('APK Sig Block 42');
         const blockSizeValue = pair.length + 8 + magic.length;
-        
         const signingBlock = new Uint8Array(8 + pair.length + 8 + 16);
-        const blockView = new DataView(signingBlock.buffer);
-        blockView.setBigUint64(0, BigInt(blockSizeValue), true);
+        new DataView(signingBlock.buffer).setBigUint64(0, BigInt(blockSizeValue), true);
         signingBlock.set(pair, 8);
-        blockView.setBigUint64(8 + pair.length, BigInt(blockSizeValue), true);
+        new DataView(signingBlock.buffer).setBigUint64(8 + pair.length, BigInt(blockSizeValue), true);
         signingBlock.set(magic, 8 + pair.length + 8);
-        
-        log(`Signing block: ${signingBlock.length} bytes`, 'info');
         
         const newCdOffset = section1.length + signingBlock.length;
         const newApk = new Uint8Array(section1.length + signingBlock.length + section3.length + section4.length);
-        
         newApk.set(section1, 0);
         newApk.set(signingBlock, section1.length);
         newApk.set(section3, section1.length + signingBlock.length);
         newApk.set(section4, section1.length + signingBlock.length + section3.length);
         
-        const newEocdOffset = section1.length + signingBlock.length + section3.length;
-        new DataView(newApk.buffer).setUint32(newEocdOffset + 16, newCdOffset, true);
+        new DataView(newApk.buffer).setUint32(section1.length + signingBlock.length + section3.length + 16, newCdOffset, true);
         
         log(`V2 signed APK: ${newApk.length} bytes`, 'success');
         return newApk;
     }
 }
 
-// ========== Permission & Authority Renaming (Fixed) ==========
-function computePermissionChanges(parser, oldPackage, newPackage) {
+// ========== Permission Changes ==========
+function computePermissionChanges(parser, oldPkg, newPkg) {
     const changes = [];
-    const suffix = '_aee';
-    const prefix = 'aee_';
-    
-    log(`Processing permissions: ${parser.permissions.length} found`, 'info');
-    
     for (const perm of parser.permissions) {
-        const val = perm.value;
-        
-        // 跳过系统权限 - 绝对不能修改！
-        if (perm.isSystem) {
-            log(`⏭️ Skip system permission: ${val}`, 'info');
-            continue;
+        if (perm.isSystem) continue;
+        if (perm.value.includes(oldPkg)) {
+            changes.push({ idx: perm.stringIdx, val: perm.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) });
+        } else if (perm.value.includes('_PERMISSION') || perm.value.includes('.permission.')) {
+            changes.push({ idx: perm.stringIdx, val: perm.value + '_aee' });
         }
-        
-        // 自定义权限处理
-        if (val.includes(oldPackage)) {
-            // 包含原包名：替换为新包名
-            const newVal = val.replace(new RegExp(oldPackage.replace(/\./g, '\\.'), 'g'), newPackage);
-            changes.push({ idx: perm.stringIdx, val: newVal });
-            log(`🔄 Permission: ${val} → ${newVal}`, 'info');
-        } else if (val.includes('_PERMISSION') || val.includes('.permission.')) {
-            // 自定义权限但不包含原包名：添加后缀避免冲突
-            const newVal = val + suffix;
-            changes.push({ idx: perm.stringIdx, val: newVal });
-            log(`➕ Permission: ${val} → ${newVal}`, 'info');
-        }
-        // 其他权限保持不变
     }
-    
-    log(`Processing authorities: ${parser.authorities.length} found`, 'info');
-    
     for (const auth of parser.authorities) {
-        const val = auth.value;
-        
-        if (val.includes(oldPackage)) {
-            // 包含原包名：替换为新包名
-            const newVal = val.replace(new RegExp(oldPackage.replace(/\./g, '\\.'), 'g'), newPackage);
-            changes.push({ idx: auth.stringIdx, val: newVal });
-            log(`🔄 Authority: ${val} → ${newVal}`, 'info');
+        if (auth.value.includes(oldPkg)) {
+            changes.push({ idx: auth.stringIdx, val: auth.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) });
         } else {
-            // 不包含原包名：添加前缀
-            const newVal = prefix + val;
-            changes.push({ idx: auth.stringIdx, val: newVal });
-            log(`➕ Authority: ${val} → ${newVal}`, 'info');
+            changes.push({ idx: auth.stringIdx, val: 'aee_' + auth.value });
         }
     }
-    
     return changes;
 }
 
 // ========== Main Application ==========
-let currentApk = null;
-let currentParser = null;
-let apkFiles = null;
+let currentApk = null, currentParser = null, apkFiles = null;
+const modes = { package: 'derived', versionCode: 'keep', versionName: 'keep', appName: 'keep', signing: 'derived' };
 
-const modes = { package: 'derived', versionCode: 'keep', versionName: 'keep', appName: 'keep' };
-
+// Mode buttons
 document.querySelectorAll('.option-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         this.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         modes[this.dataset.target] = this.dataset.mode;
+        
+        if (this.dataset.target === 'signing') {
+            $('signingDerived').style.display = this.dataset.mode === 'derived' ? 'block' : 'none';
+            $('signingCustom').style.display = this.dataset.mode === 'custom' ? 'block' : 'none';
+            $('signingJks').style.display = this.dataset.mode === 'jks' ? 'block' : 'none';
+        }
+        
         updateFields();
     });
 });
 
 $('randomSeed').addEventListener('input', updateFields);
+$('masterSigningKey').addEventListener('input', updateSigningSeed);
+$('newPackage').addEventListener('input', updateSigningSeed);
+
+function updateSigningSeed() {
+    const masterKey = $('masterSigningKey').value;
+    const pkg = $('newPackage').value || (currentParser?.info?.package || '');
+    const seed = deriveSigningSeed(masterKey, pkg);
+    $('derivedSigningSeed').textContent = seed;
+}
 
 function updateFields() {
     if (!currentParser) return;
@@ -1140,26 +1362,21 @@ function updateFields() {
     
     if (modes.appName === 'derived') $('newAppName').value = deriveName(seed);
     else if (modes.appName === 'keep') $('newAppName').value = info.label || '';
+    
+    updateSigningSeed();
 }
 
+// File handling
 const uploadZone = $('uploadZone');
 const fileInput = $('apkFile');
-
 uploadZone.addEventListener('click', () => fileInput.click());
 uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-uploadZone.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadZone.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-});
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
 
 async function handleFile(file) {
-    if (!file.name.toLowerCase().endsWith('.apk')) {
-        alert('Please select an APK file');
-        return;
-    }
+    if (!file.name.toLowerCase().endsWith('.apk')) { alert('Please select an APK file'); return; }
     
     $('logContainer').innerHTML = '';
     $('logCard').style.display = 'block';
@@ -1177,47 +1394,34 @@ async function handleFile(file) {
         
         apkFiles = new Map();
         for (const [name] of zip.entries) {
-            try {
-                const data = await zip.getEntry(name);
-                if (data) apkFiles.set(name, data);
-            } catch (e) {
-                log(`Warning: Could not read ${name}`, 'warn');
-            }
+            try { const data = await zip.getEntry(name); if (data) apkFiles.set(name, data); }
+            catch (e) { log(`Warning: Could not read ${name}`, 'warn'); }
         }
         
         const info = currentParser.info;
         $('origPackage').textContent = info.package || 'Unknown';
-        $('origVersionCode').textContent = info.versionCode !== undefined ? info.versionCode : 'Unknown';
+        $('origVersionCode').textContent = info.versionCode ?? 'Unknown';
         $('origVersionName').textContent = info.versionName || 'Unknown';
         $('origLabel').textContent = info.label || 'Unknown';
-        $('origMinSdk').textContent = info.minSdk !== undefined ? info.minSdk : 'Unknown';
-        $('origTargetSdk').textContent = info.targetSdk !== undefined ? info.targetSdk : 'Unknown';
+        $('origMinSdk').textContent = info.minSdk ?? 'Unknown';
+        $('origTargetSdk').textContent = info.targetSdk ?? 'Unknown';
         
         log(`Package: ${info.package}`, 'success');
         log(`Version: ${info.versionCode} (${info.versionName})`, 'success');
         log(`SDK: min=${info.minSdk}, target=${info.targetSdk}`, 'success');
         
-        // 统计权限
-        const systemPerms = currentParser.permissions.filter(p => p.isSystem).length;
-        const customPerms = currentParser.permissions.filter(p => !p.isSystem).length;
-        log(`Permissions: ${systemPerms} system, ${customPerms} custom`, 'info');
-        log(`Authorities: ${currentParser.authorities.length}`, 'info');
-        
         $('apkInfo').style.display = 'block';
         $('editCard').style.display = 'block';
         updateFields();
-        
     } catch (e) {
         log(`Error: ${e.message}`, 'error');
         console.error(e);
     }
 }
 
+// Repack
 $('repackBtn').addEventListener('click', async () => {
-    if (!currentApk || !currentParser) {
-        alert('Please load an APK first');
-        return;
-    }
+    if (!currentApk || !currentParser) { alert('Please load an APK first'); return; }
     
     $('repackBtn').disabled = true;
     $('progressContainer').style.display = 'block';
@@ -1226,120 +1430,92 @@ $('repackBtn').addEventListener('click', async () => {
         setProgress(5, 'Preparing...');
         
         const info = currentParser.info;
-        const oldPackage = info.package || '';
-        const newPackage = $('newPackage').value || oldPackage;
-        const newVersionCode = parseInt($('newVersionCode').value) || info.versionCode || 1;
-        const newVersionName = $('newVersionName').value || info.versionName || '1.0';
+        const oldPkg = info.package || '';
+        const newPkg = $('newPackage').value || oldPkg;
+        const newVC = parseInt($('newVersionCode').value) || info.versionCode || 1;
+        const newVN = $('newVersionName').value || info.versionName || '1.0';
         const renamePerms = $('renamePermissions').checked;
         
-        log(`New package: ${newPackage}`, 'info');
-        log(`New version: ${newVersionCode} (${newVersionName})`, 'info');
-        log(`Rename custom permissions: ${renamePerms}`, 'info');
+        log(`New package: ${newPkg}`, 'info');
+        log(`New version: ${newVC} (${newVN})`, 'info');
         
         setProgress(10, 'Modifying manifest...');
         
         let manifest = apkFiles.get('AndroidManifest.xml');
-        
         const stringChanges = [];
         
-        if (modes.package !== 'keep' && info.packageStringIdx !== undefined) {
-            stringChanges.push({ idx: info.packageStringIdx, val: newPackage });
-        }
+        if (modes.package !== 'keep' && info.packageStringIdx !== undefined)
+            stringChanges.push({ idx: info.packageStringIdx, val: newPkg });
+        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined)
+            stringChanges.push({ idx: info.versionNameStringIdx, val: newVN });
+        if (renamePerms && modes.package !== 'keep' && oldPkg !== newPkg)
+            stringChanges.push(...computePermissionChanges(currentParser, oldPkg, newPkg));
         
-        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined) {
-            stringChanges.push({ idx: info.versionNameStringIdx, val: newVersionName });
-        }
+        if (stringChanges.length > 0) manifest = new AXMLModifier(manifest).modifyStrings(stringChanges);
+        if (modes.versionCode !== 'keep') { const m = new AXMLModifier(manifest); m.modifyIntAttr('manifest', 'versionCode', newVC); manifest = m.data; }
         
-        // 权限和authorities修改（仅当启用且包名变更时）
-        if (renamePerms && modes.package !== 'keep' && oldPackage !== newPackage) {
-            const permChanges = computePermissionChanges(currentParser, oldPackage, newPackage);
-            stringChanges.push(...permChanges);
-        }
-        
-        if (stringChanges.length > 0) {
-            const modifier = new AXMLModifier(manifest);
-            manifest = modifier.modifyStrings(stringChanges);
-        }
-        
-        if (modes.versionCode !== 'keep') {
-            const modifier = new AXMLModifier(manifest);
-            modifier.modifyIntAttr('manifest', 'versionCode', newVersionCode);
-            manifest = modifier.data;
-        }
-        
-        setProgress(25, 'Building ZIP with alignment...');
+        setProgress(25, 'Building ZIP...');
         
         const zipWriter = new ZipWriter();
         const filesToSign = [];
-        let count = 0;
-        
-        const sortedFiles = [...apkFiles.entries()]
-            .filter(([name]) => !name.startsWith('META-INF/'))
-            .sort((a, b) => a[0].localeCompare(b[0]));
+        const sortedFiles = [...apkFiles.entries()].filter(([n]) => !n.startsWith('META-INF/')).sort((a, b) => a[0].localeCompare(b[0]));
         
         for (const [name, data] of sortedFiles) {
-            const fileData = (name === 'AndroidManifest.xml') ? manifest : data;
-            
-            let compress = true;
-            let alignment = 0;
-            
-            if (name.endsWith('.so') || name.startsWith('lib/')) {
-                compress = false;
-                alignment = 4096;
-            } else if (name === 'resources.arsc') {
-                compress = false;
-                alignment = 4;
-            } else if (name.match(/\.(png|jpg|jpeg|gif|webp|mp3|ogg|mp4|m4a|aac|wav|flac|zip|jar)$/i)) {
-                compress = false;
-                alignment = 4;
-            }
-            
+            const fileData = name === 'AndroidManifest.xml' ? manifest : data;
+            let compress = true, alignment = 0;
+            if (name.endsWith('.so') || name.startsWith('lib/')) { compress = false; alignment = 4096; }
+            else if (name === 'resources.arsc') { compress = false; alignment = 4; }
+            else if (name.match(/\.(png|jpg|jpeg|gif|webp|mp3|ogg|mp4|wav|flac)$/i)) { compress = false; alignment = 4; }
             zipWriter.addFile(name, fileData, { compress, alignment });
             filesToSign.push({ name, data: fileData });
-            
-            if (++count % 100 === 0) {
-                setProgress(25 + (count / sortedFiles.length) * 20, `Files: ${count}/${sortedFiles.length}`);
-            }
         }
         
-        log(`Added ${filesToSign.length} files with proper alignment`, 'info');
+        log(`Added ${filesToSign.length} files`, 'info');
         
-        setProgress(50, 'Generating certificate...');
+        setProgress(45, 'Generating signing key...');
         
         const signer = new APKSigner();
-        await signer.generateKey(newPackage);
+        
+        if (modes.signing === 'jks') {
+            const jksFile = $('jksFile').files[0];
+            if (!jksFile) throw new Error('Please select a keystore file');
+            const jksBuffer = await jksFile.arrayBuffer();
+            await signer.loadFromKeystore(jksBuffer, $('storePassword').value, $('keyAlias').value, $('keyPassword').value);
+        } else {
+            let signingSeed;
+            if (modes.signing === 'custom') {
+                signingSeed = $('customSigningSeed').value;
+                if (!signingSeed) throw new Error('Please enter a custom signing seed');
+            } else {
+                signingSeed = deriveSigningSeed($('masterSigningKey').value, newPkg);
+            }
+            log(`Using signing seed: ${signingSeed.slice(0, 16)}...`, 'info');
+            await signer.generateFromSeed(signingSeed, newPkg);
+        }
         
         setProgress(60, 'Creating V1 signature...');
-        
         const v1 = await signer.signV1(filesToSign);
-        zipWriter.addFile('META-INF/MANIFEST.MF', v1.mf, { compress: false, alignment: 0 });
-        zipWriter.addFile('META-INF/CERT.SF', v1.sf, { compress: false, alignment: 0 });
-        zipWriter.addFile('META-INF/CERT.RSA', v1.rsa, { compress: false, alignment: 0 });
+        zipWriter.addFile('META-INF/MANIFEST.MF', v1.mf, { compress: false });
+        zipWriter.addFile('META-INF/CERT.SF', v1.sf, { compress: false });
+        zipWriter.addFile('META-INF/CERT.RSA', v1.rsa, { compress: false });
         
         setProgress(75, 'Building APK...');
-        
         let apkData = await zipWriter.build();
         log(`Pre-V2 APK: ${apkData.length} bytes`, 'info');
         
         setProgress(85, 'Creating V2 signature...');
-        
         apkData = await signer.signV2(apkData);
         
         setProgress(95, 'Downloading...');
-        
-        const blob = new Blob([apkData], { type: 'application/vnd.android.package-archive' });
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `${newPackage.split('.').pop()}_v${newVersionCode}.apk`;
+        a.href = URL.createObjectURL(new Blob([apkData], { type: 'application/vnd.android.package-archive' }));
+        a.download = `${newPkg.split('.').pop()}_v${newVC}.apk`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
         
         setProgress(100, 'Complete!');
         log(`Done! Final size: ${(apkData.length / 1024 / 1024).toFixed(2)} MB`, 'success');
-        
     } catch (e) {
         log(`Error: ${e.message}`, 'error');
         console.error(e);
