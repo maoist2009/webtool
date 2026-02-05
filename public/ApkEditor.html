@@ -14,6 +14,8 @@
         .container { max-width: 900px; margin: 0 auto; }
         h1 { text-align: center; margin-bottom: 10px; color: #4fc3f7; }
         .credit { text-align: center; font-size: 12px; color: #888; margin-bottom: 20px; }
+        .credit a { color: #4fc3f7; text-decoration: none; }
+        .credit a:hover { text-decoration: underline; }
         .card {
             background: rgba(255,255,255,0.05); border-radius: 16px;
             padding: 24px; margin-bottom: 20px;
@@ -110,11 +112,12 @@
             font-family: monospace; font-size: 12px; color: #ffa726;
             word-break: break-all; margin-top: 8px;
         }
-        .jks-options { display: none; margin-top: 12px; }
-        .jks-options.show { display: block; }
-        @media (max-width: 600px) {
-            .row { flex-direction: column; gap: 0; }
+        .url-params-hint {
+            background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.3);
+            border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px;
         }
+        .url-params-hint code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; }
+        @media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
     </style>
 </head>
 <body>
@@ -124,6 +127,9 @@
         
         <div class="card">
             <h2>📁 Upload APK</h2>
+            <div class="url-params-hint" id="urlParamsHint" style="display:none">
+                ⚙️ URL parameters detected and applied!
+            </div>
             <div class="upload-zone" id="uploadZone">
                 <p>📦 Drop APK here or click to select</p>
             </div>
@@ -144,7 +150,7 @@
             <h2>✏️ Edit Configuration</h2>
             
             <div class="form-group">
-                <label>Random Seed</label>
+                <label>Random Seed (for package/name derivation)</label>
                 <input type="text" id="randomSeed" value="apk-editor-2024">
             </div>
 
@@ -190,7 +196,7 @@
             <div class="switch-row">
                 <div class="switch-label">
                     🔐 Rename Custom Permissions & Authorities
-                    <div class="help-text">System permissions (android.permission.*) are NOT modified</div>
+                    <div class="help-text">Only app-specific permissions are modified. System and vendor permissions (Samsung, Huawei, OPPO, etc.) are preserved.</div>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="renamePermissions">
@@ -198,15 +204,14 @@
                 </label>
             </div>
 
-            <!-- Signing Section -->
             <div class="signing-section">
                 <h3>🔑 Signing Configuration</h3>
                 
                 <div class="form-group">
                     <label>Signing Mode</label>
                     <div class="option-group">
-                        <button class="option-btn active" data-mode="derived" data-target="signing">Derived from Seed</button>
-                        <button class="option-btn" data-mode="custom" data-target="signing">Custom Seed</button>
+                        <button class="option-btn active" data-mode="derived" data-target="signing">Derived from Master Key</button>
+                        <button class="option-btn" data-mode="custom" data-target="signing">Custom Signing Seed</button>
                         <button class="option-btn" data-mode="jks" data-target="signing">Upload JKS/P12</button>
                     </div>
                 </div>
@@ -214,8 +219,8 @@
                 <div id="signingDerived">
                     <div class="form-group">
                         <label>Master Signing Key</label>
-                        <input type="text" id="masterSigningKey" value="apk-editor-master-2024" placeholder="Master key for deriving signatures">
-                        <div class="help-text">Same master key + same package = same signature</div>
+                        <input type="text" id="masterSigningKey" value="apk-editor-master-2024">
+                        <div class="help-text">Same master key + same package = same signature (fully deterministic)</div>
                     </div>
                     <div class="seed-display">
                         Signing Seed: <span id="derivedSigningSeed">-</span>
@@ -225,12 +230,12 @@
                 <div id="signingCustom" style="display:none">
                     <div class="form-group">
                         <label>Custom Signing Seed</label>
-                        <input type="text" id="customSigningSeed" placeholder="Enter custom signing seed">
-                        <div class="help-text">Use same seed for apps that need sharedUserId</div>
+                        <input type="text" id="customSigningSeed" placeholder="Enter custom signing seed for sharedUserId">
+                        <div class="help-text">Apps with same signing seed will have identical signatures</div>
                     </div>
                 </div>
 
-                <div id="signingJks" class="jks-options">
+                <div id="signingJks" style="display:none">
                     <div class="form-group">
                         <label>JKS/P12/KeyStore File</label>
                         <input type="file" id="jksFile" accept=".jks,.keystore,.p12,.pfx">
@@ -238,16 +243,16 @@
                     <div class="row">
                         <div class="form-group">
                             <label>Store Password</label>
-                            <input type="password" id="storePassword" placeholder="Keystore password">
+                            <input type="password" id="storePassword">
                         </div>
                         <div class="form-group">
                             <label>Key Alias</label>
-                            <input type="text" id="keyAlias" placeholder="Key alias">
+                            <input type="text" id="keyAlias">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Key Password</label>
-                        <input type="password" id="keyPassword" placeholder="Key password (if different)">
+                        <label>Key Password (if different)</label>
+                        <input type="password" id="keyPassword">
                     </div>
                 </div>
             </div>
@@ -268,6 +273,25 @@
                 <button class="btn btn-small" onclick="copyLog()">📋 Copy</button>
             </div>
             <div class="log" id="logContainer"></div>
+        </div>
+        
+        <div class="card">
+            <h2>📖 URL Parameters</h2>
+            <div class="help-text" style="font-size:13px;line-height:1.6">
+                <p>Supported URL parameters:</p>
+                <ul style="margin-left:20px;margin-top:8px">
+                    <li><code>seed</code> - Random seed for derivation</li>
+                    <li><code>masterKey</code> - Master signing key</li>
+                    <li><code>signingSeed</code> - Custom signing seed (overrides derived)</li>
+                    <li><code>package</code> - Custom package name</li>
+                    <li><code>packageMode</code> - derived/custom/keep</li>
+                    <li><code>versionCode</code> - Custom version code</li>
+                    <li><code>versionName</code> - Custom version name</li>
+                    <li><code>appName</code> - Custom app name</li>
+                    <li><code>renamePerms</code> - 1/0 to rename permissions</li>
+                </ul>
+                <p style="margin-top:8px">Example: <code>?masterKey=mykey&packageMode=keep</code></p>
+            </div>
         </div>
     </div>
     <div class="toast" id="toast">Copied!</div>
@@ -293,7 +317,255 @@ const setProgress = (p, t) => {
     $('progressText').textContent = t;
 };
 
-// ========== Seeded Random ==========
+// ========== URL Parameters ==========
+function getUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        seed: params.get('seed'),
+        masterKey: params.get('masterKey'),
+        signingSeed: params.get('signingSeed'),
+        package: params.get('package'),
+        packageMode: params.get('packageMode'),
+        versionCode: params.get('versionCode'),
+        versionName: params.get('versionName'),
+        appName: params.get('appName'),
+        appNameMode: params.get('appNameMode'),
+        renamePerms: params.get('renamePerms'),
+    };
+}
+
+function applyUrlParams() {
+    const params = getUrlParams();
+    let applied = false;
+    
+    if (params.seed) { $('randomSeed').value = params.seed; applied = true; }
+    if (params.masterKey) { $('masterSigningKey').value = params.masterKey; applied = true; }
+    if (params.signingSeed) {
+        $('customSigningSeed').value = params.signingSeed;
+        setMode('signing', 'custom');
+        applied = true;
+    }
+    if (params.package) { $('newPackage').value = params.package; applied = true; }
+    if (params.packageMode) { setMode('package', params.packageMode); applied = true; }
+    if (params.versionCode) { $('newVersionCode').value = params.versionCode; setMode('versionCode', 'custom'); applied = true; }
+    if (params.versionName) { $('newVersionName').value = params.versionName; setMode('versionName', 'custom'); applied = true; }
+    if (params.appName) { $('newAppName').value = params.appName; setMode('appName', 'custom'); applied = true; }
+    if (params.appNameMode) { setMode('appName', params.appNameMode); applied = true; }
+    if (params.renamePerms === '1') { $('renamePermissions').checked = true; applied = true; }
+    
+    if (applied) {
+        $('urlParamsHint').style.display = 'block';
+        log('URL parameters applied', 'success');
+    }
+}
+
+function setMode(target, mode) {
+    modes[target] = mode;
+    document.querySelectorAll(`.option-btn[data-target="${target}"]`).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    
+    if (target === 'signing') {
+        $('signingDerived').style.display = mode === 'derived' ? 'block' : 'none';
+        $('signingCustom').style.display = mode === 'custom' ? 'block' : 'none';
+        $('signingJks').style.display = mode === 'jks' ? 'block' : 'none';
+    }
+}
+
+// ========== Deterministic Byte Generator ==========
+class DeterministicBytes {
+    constructor(seed) {
+        this.seed = seed;
+        this.counter = 0;
+        this.buffer = new Uint8Array(0);
+        this.bufferPos = 0;
+    }
+    
+    async ensureBuffer(needed) {
+        if (this.bufferPos + needed <= this.buffer.length) return;
+        
+        const chunks = [];
+        let total = 0;
+        while (total < needed + 256) {
+            const data = new TextEncoder().encode(`${this.seed}|${this.counter++}`);
+            const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+            chunks.push(hash);
+            total += 32;
+        }
+        
+        const newBuffer = new Uint8Array(this.buffer.length - this.bufferPos + total);
+        newBuffer.set(this.buffer.subarray(this.bufferPos), 0);
+        let offset = this.buffer.length - this.bufferPos;
+        for (const chunk of chunks) {
+            newBuffer.set(chunk, offset);
+            offset += chunk.length;
+        }
+        this.buffer = newBuffer;
+        this.bufferPos = 0;
+    }
+    
+    async getBytes(n) {
+        await this.ensureBuffer(n);
+        const result = this.buffer.slice(this.bufferPos, this.bufferPos + n);
+        this.bufferPos += n;
+        return result;
+    }
+    
+    async getBigInt(bits) {
+        const bytes = Math.ceil(bits / 8);
+        const arr = await this.getBytes(bytes);
+        let hex = '';
+        for (const b of arr) hex += b.toString(16).padStart(2, '0');
+        return BigInt('0x' + hex);
+    }
+}
+
+// ========== Deterministic RSA Key Generation ==========
+class DeterministicRSA {
+    constructor(seed) {
+        this.byteGen = new DeterministicBytes(seed);
+    }
+    
+    isProbablePrime(n) {
+        if (n < 2n) return false;
+        if (n === 2n || n === 3n) return true;
+        if (n % 2n === 0n) return false;
+        
+        const smallPrimes = [3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n, 41n, 43n, 47n];
+        for (const p of smallPrimes) {
+            if (n === p) return true;
+            if (n % p === 0n) return false;
+        }
+        
+        let r = 0n, d = n - 1n;
+        while (d % 2n === 0n) { d /= 2n; r++; }
+        
+        const witnesses = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n];
+        
+        for (const a of witnesses) {
+            if (a >= n - 1n) continue;
+            
+            let x = this.modPow(a, d, n);
+            if (x === 1n || x === n - 1n) continue;
+            
+            let composite = true;
+            for (let j = 1n; j < r; j++) {
+                x = (x * x) % n;
+                if (x === n - 1n) { composite = false; break; }
+            }
+            if (composite) return false;
+        }
+        return true;
+    }
+    
+    modPow(base, exp, mod) {
+        let result = 1n;
+        base = base % mod;
+        while (exp > 0n) {
+            if (exp % 2n === 1n) result = (result * base) % mod;
+            exp = exp / 2n;
+            base = (base * base) % mod;
+        }
+        return result;
+    }
+    
+    modInverse(a, m) {
+        let [old_r, r] = [a, m];
+        let [old_s, s] = [1n, 0n];
+        while (r !== 0n) {
+            const q = old_r / r;
+            [old_r, r] = [r, old_r - q * r];
+            [old_s, s] = [s, old_s - q * s];
+        }
+        return ((old_s % m) + m) % m;
+    }
+    
+    async generatePrime(bits) {
+        const bytes = Math.ceil(bits / 8);
+        
+        while (true) {
+            const arr = await this.byteGen.getBytes(bytes);
+            
+            arr[0] |= 0xC0;
+            arr[bytes - 1] |= 0x01;
+            
+            let n = 0n;
+            for (const b of arr) n = (n << 8n) | BigInt(b);
+            
+            const targetMax = 1n << BigInt(bits);
+            const targetMin = 1n << BigInt(bits - 1);
+            if (n >= targetMax) n = targetMin | (n & (targetMin - 1n));
+            n |= 1n;
+            
+            if (this.isProbablePrime(n)) {
+                return n;
+            }
+        }
+    }
+    
+    bigIntToBytes(n, length) {
+        const hex = n.toString(16).padStart(length * 2, '0');
+        const bytes = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+            bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        }
+        return bytes;
+    }
+    
+    async generate() {
+        log('Generating deterministic RSA-2048 key pair...', 'info');
+        
+        const p = await this.generatePrime(1024);
+        log('Generated first prime', 'info');
+        
+        const q = await this.generatePrime(1024);
+        log('Generated second prime', 'info');
+        
+        const n = p * q;
+        const phi = (p - 1n) * (q - 1n);
+        const e = 65537n;
+        const d = this.modInverse(e, phi);
+        
+        const dp = d % (p - 1n);
+        const dq = d % (q - 1n);
+        const qi = this.modInverse(q, p);
+        
+        const b64url = arr => btoa(String.fromCharCode(...arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        
+        const jwk = {
+            kty: 'RSA',
+            n: b64url(this.bigIntToBytes(n, 256)),
+            e: b64url(this.bigIntToBytes(e, 3)),
+            d: b64url(this.bigIntToBytes(d, 256)),
+            p: b64url(this.bigIntToBytes(p, 128)),
+            q: b64url(this.bigIntToBytes(q, 128)),
+            dp: b64url(this.bigIntToBytes(dp, 128)),
+            dq: b64url(this.bigIntToBytes(dq, 128)),
+            qi: b64url(this.bigIntToBytes(qi, 128)),
+            alg: 'RS256',
+            ext: true
+        };
+        
+        const privateKey = await crypto.subtle.importKey(
+            'jwk', jwk,
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            true, ['sign']
+        );
+        
+        const publicKey = await crypto.subtle.importKey(
+            'jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            true, ['verify']
+        );
+        
+        const publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
+        
+        log('Deterministic key pair generated successfully', 'success');
+        return { privateKey, publicKey, publicKeyDer };
+    }
+}
+
+// ========== Seeded Random for non-crypto ==========
 class SeededRandom {
     constructor(seed) {
         this.s = 0;
@@ -303,11 +575,6 @@ class SeededRandom {
     next() { this.s = (this.s * 1103515245 + 12345) & 0x7fffffff; return this.s / 0x7fffffff; }
     int(a, b) { return Math.floor(this.next() * (b - a + 1)) + a; }
     pick(arr) { return arr[this.int(0, arr.length - 1)]; }
-    bytes(n) {
-        const arr = new Uint8Array(n);
-        for (let i = 0; i < n; i++) arr[i] = this.int(0, 255);
-        return arr;
-    }
 }
 
 const derivePackage = (orig, seed) => {
@@ -319,27 +586,75 @@ const deriveName = seed => {
     return `${r.pick(['Super','Ultra','Pro','Fast'])} ${r.pick(['App','Tool','Helper'])}`;
 };
 
-// Derive signing seed from master key + package
 function deriveSigningSeed(masterKey, packageName) {
-    const combined = `${masterKey}:${packageName}:signing`;
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-        hash = ((hash << 5) - hash + combined.charCodeAt(i)) | 0;
-    }
-    // Create a readable seed
+    const combined = `${masterKey}|${packageName}|signing-v2`;
     const r = new SeededRandom(combined);
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let seed = '';
-    for (let i = 0; i < 32; i++) {
-        seed += chars[r.int(0, chars.length - 1)];
-    }
+    for (let i = 0; i < 32; i++) seed += chars[r.int(0, chars.length - 1)];
     return seed;
 }
 
-// ========== System Permissions ==========
-const SYSTEM_PERMISSION_PREFIXES = ['android.permission.', 'com.android.', 'com.google.android.'];
-function isSystemPermission(permName) {
-    return SYSTEM_PERMISSION_PREFIXES.some(p => permName.startsWith(p));
+// ========== Vendor/System Permission Detection ==========
+// These permissions should NEVER be modified - they're for system/vendor integration
+const PROTECTED_PERMISSION_PREFIXES = [
+    // Android system
+    'android.permission.',
+    'android.',
+    'com.android.',
+    'com.google.android.',
+    
+    // Samsung
+    'com.sec.android.',
+    'com.samsung.',
+    
+    // Huawei
+    'com.huawei.',
+    
+    // OPPO/OnePlus/Realme
+    'com.oppo.',
+    'com.oneplus.',
+    'com.realme.',
+    'com.coloros.',
+    
+    // Xiaomi/MIUI
+    'com.xiaomi.',
+    'com.miui.',
+    
+    // Vivo
+    'com.vivo.',
+    
+    // Sony
+    'com.sonyericsson.',
+    'com.sonymobile.',
+    
+    // HTC
+    'com.htc.',
+    
+    // LG
+    'com.lge.',
+    
+    // ASUS
+    'com.asus.',
+    
+    // Meizu
+    'com.meizu.',
+    
+    // Other launchers
+    'com.anddoes.launcher.',
+    'com.majeur.launcher.',
+    'com.teslacoilsw.',
+    'com.actionlauncher.',
+    'me.everything.badger.',
+    
+    // Common libraries
+    'androidx.',
+    'com.google.firebase.',
+    'com.facebook.',
+];
+
+function isProtectedPermission(permName) {
+    return PROTECTED_PERMISSION_PREFIXES.some(prefix => permName.startsWith(prefix));
 }
 
 // ========== ZIP Reader ==========
@@ -360,9 +675,7 @@ class ZipReader {
         
         let pos = cdOffset;
         for (let i = 0; i < cdCount; i++) {
-            if (pos + 46 > buffer.byteLength) break;
-            if (this.view.getUint32(pos, true) !== 0x02014b50) break;
-            
+            if (pos + 46 > buffer.byteLength || this.view.getUint32(pos, true) !== 0x02014b50) break;
             const method = this.view.getUint16(pos + 10, true);
             const compSize = this.view.getUint32(pos + 20, true);
             const nameLen = this.view.getUint16(pos + 28, true);
@@ -370,132 +683,99 @@ class ZipReader {
             const commentLen = this.view.getUint16(pos + 32, true);
             const localOffset = this.view.getUint32(pos + 42, true);
             const name = new TextDecoder().decode(new Uint8Array(buffer, pos + 46, nameLen));
-            
             this.entries.set(name, { method, compSize, localOffset });
             pos += 46 + nameLen + extraLen + commentLen;
         }
     }
     
     async getEntry(name) {
-        const entry = this.entries.get(name);
-        if (!entry) return null;
-        
-        const localNameLen = this.view.getUint16(entry.localOffset + 26, true);
-        const localExtraLen = this.view.getUint16(entry.localOffset + 28, true);
-        const dataOffset = entry.localOffset + 30 + localNameLen + localExtraLen;
-        const compData = new Uint8Array(this.buffer, dataOffset, entry.compSize);
-        
-        if (entry.method === 0) return compData.slice();
-        if (entry.method === 8) {
-            const ds = new DecompressionStream('deflate-raw');
-            return new Uint8Array(await new Response(new Blob([compData]).stream().pipeThrough(ds)).arrayBuffer());
-        }
-        throw new Error(`Unsupported compression: ${entry.method}`);
+        const e = this.entries.get(name);
+        if (!e) return null;
+        const nLen = this.view.getUint16(e.localOffset + 26, true);
+        const eLen = this.view.getUint16(e.localOffset + 28, true);
+        const data = new Uint8Array(this.buffer, e.localOffset + 30 + nLen + eLen, e.compSize);
+        if (e.method === 0) return data.slice();
+        if (e.method === 8) return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+        throw new Error(`Unsupported compression: ${e.method}`);
     }
 }
 
-// ========== ZIP Writer with alignment ==========
+// ========== ZIP Writer ==========
 class ZipWriter {
     constructor() { this.files = []; }
+    static crc32Table = (() => { const t=[]; for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=(c&1)?0xEDB88320^(c>>>1):c>>>1;t.push(c);}return t; })();
+    crc32(d) { let c=0xFFFFFFFF; for(let i=0;i<d.length;i++)c=ZipWriter.crc32Table[(c^d[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
     
-    static crc32Table = (() => {
-        const table = [];
-        for (let i = 0; i < 256; i++) {
-            let c = i;
-            for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-            table.push(c);
-        }
-        return table;
-    })();
-    
-    crc32(data) {
-        let crc = 0xFFFFFFFF;
-        for (let i = 0; i < data.length; i++) crc = ZipWriter.crc32Table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
-        return (crc ^ 0xFFFFFFFF) >>> 0;
-    }
-    
-    addFile(name, data, options = {}) {
+    addFile(name, data, opt={}) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-        const { compress = true, alignment = 0 } = options;
-        this.files.push({ name, data: bytes, compress: compress && alignment === 0, alignment, crc: this.crc32(bytes) });
+        this.files.push({ name, data: bytes, compress: opt.compress !== false && opt.alignment === 0, alignment: opt.alignment || 0, crc: this.crc32(bytes) });
     }
     
     async build() {
-        const chunks = [];
-        const cdEntries = [];
-        let offset = 0;
-        
-        for (const file of this.files) {
-            const nameBytes = new TextEncoder().encode(file.name);
-            let compData = file.data;
-            let method = 0;
-            
-            if (file.compress && file.data.length > 0) {
+        const chunks = [], cd = [];
+        let off = 0;
+        for (const f of this.files) {
+            const nameBytes = new TextEncoder().encode(f.name);
+            let comp = f.data, method = 0;
+            if (f.compress && f.data.length > 0) {
                 try {
-                    const cs = new CompressionStream('deflate-raw');
-                    const result = await new Response(new Blob([file.data]).stream().pipeThrough(cs)).arrayBuffer();
-                    if (result.byteLength < file.data.length * 0.9) { compData = new Uint8Array(result); method = 8; }
-                } catch (e) {}
+                    const r = await new Response(new Blob([f.data]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
+                    if (r.byteLength < f.data.length * 0.9) { comp = new Uint8Array(r); method = 8; }
+                } catch(e) {}
+            }
+            let extra = 0;
+            if (f.alignment > 0 && method === 0) {
+                const m = (off + 30 + nameBytes.length) % f.alignment;
+                if (m !== 0) extra = f.alignment - m;
             }
             
-            let extraSize = 0;
-            if (file.alignment > 0 && method === 0) {
-                const headerAndName = offset + 30 + nameBytes.length;
-                const misalignment = headerAndName % file.alignment;
-                if (misalignment !== 0) extraSize = file.alignment - misalignment;
-            }
-            
-            const local = new Uint8Array(30);
-            const lv = new DataView(local.buffer);
+            const lh = new Uint8Array(30), lv = new DataView(lh.buffer);
             lv.setUint32(0, 0x04034B50, true);
             lv.setUint16(4, 20, true);
             lv.setUint16(8, method, true);
             lv.setUint16(10, 0x0821, true);
             lv.setUint16(12, 0x0021, true);
-            lv.setUint32(14, file.crc, true);
-            lv.setUint32(18, compData.length, true);
-            lv.setUint32(22, file.data.length, true);
+            lv.setUint32(14, f.crc, true);
+            lv.setUint32(18, comp.length, true);
+            lv.setUint32(22, f.data.length, true);
             lv.setUint16(26, nameBytes.length, true);
-            lv.setUint16(28, extraSize, true);
+            lv.setUint16(28, extra, true);
             
-            chunks.push(local, nameBytes);
-            if (extraSize > 0) chunks.push(new Uint8Array(extraSize));
-            chunks.push(compData);
+            chunks.push(lh, nameBytes);
+            if (extra > 0) chunks.push(new Uint8Array(extra));
+            chunks.push(comp);
             
-            const fileOffset = offset;
-            offset += 30 + nameBytes.length + extraSize + compData.length;
+            const fOff = off;
+            off += 30 + nameBytes.length + extra + comp.length;
             
-            const cd = new Uint8Array(46);
-            const cv = new DataView(cd.buffer);
+            const ch = new Uint8Array(46), cv = new DataView(ch.buffer);
             cv.setUint32(0, 0x02014B50, true);
             cv.setUint16(4, 0x0314, true);
             cv.setUint16(6, 20, true);
             cv.setUint16(10, method, true);
             cv.setUint16(12, 0x0821, true);
             cv.setUint16(14, 0x0021, true);
-            cv.setUint32(16, file.crc, true);
-            cv.setUint32(20, compData.length, true);
-            cv.setUint32(24, file.data.length, true);
+            cv.setUint32(16, f.crc, true);
+            cv.setUint32(20, comp.length, true);
+            cv.setUint32(24, f.data.length, true);
             cv.setUint16(28, nameBytes.length, true);
-            cv.setUint32(42, fileOffset, true);
-            
-            cdEntries.push(cd, nameBytes);
+            cv.setUint32(42, fOff, true);
+            cd.push(ch, nameBytes);
         }
         
-        const cdOffset = offset;
+        const cdOff = off;
         let cdSize = 0;
-        for (const c of cdEntries) { chunks.push(c); cdSize += c.length; }
+        for (const c of cd) { chunks.push(c); cdSize += c.length; }
         
-        const eocd = new Uint8Array(22);
-        const ev = new DataView(eocd.buffer);
+        const eocd = new Uint8Array(22), ev = new DataView(eocd.buffer);
         ev.setUint32(0, 0x06054B50, true);
         ev.setUint16(8, this.files.length, true);
         ev.setUint16(10, this.files.length, true);
         ev.setUint32(12, cdSize, true);
-        ev.setUint32(16, cdOffset, true);
+        ev.setUint32(16, cdOff, true);
         chunks.push(eocd);
         
-        const total = chunks.reduce((s, c) => s + c.length, 0);
+        const total = chunks.reduce((s,c) => s + c.length, 0);
         const result = new Uint8Array(total);
         let pos = 0;
         for (const c of chunks) { result.set(c, pos); pos += c.length; }
@@ -516,109 +796,80 @@ class AXMLParser {
         this.parse();
     }
     
-    readU16(offset) { return this.view.getUint16(offset, true); }
-    readU32(offset) { return this.view.getUint32(offset, true); }
-    readI32(offset) { return this.view.getInt32(offset, true); }
+    readU16(o) { return this.view.getUint16(o, true); }
+    readU32(o) { return this.view.getUint32(o, true); }
+    readI32(o) { return this.view.getInt32(o, true); }
     
     parse() {
-        if (this.readU32(0) !== 0x00080003) throw new Error('Invalid AXML magic');
+        if (this.readU32(0) !== 0x00080003) throw new Error('Invalid AXML');
         let pos = 8;
         while (pos + 8 <= this.data.length) {
-            const chunkType = this.readU16(pos);
-            const headerSize = this.readU16(pos + 2);
-            const chunkSize = this.readU32(pos + 4);
-            if (chunkSize < 8 || pos + chunkSize > this.data.length) break;
-            if (chunkType === 0x0001) this.parseStringPool(pos, chunkSize);
-            else if (chunkType === 0x0102) this.parseStartElement(pos, headerSize);
-            pos += chunkSize;
+            const type = this.readU16(pos), hdrSize = this.readU16(pos+2), size = this.readU32(pos+4);
+            if (size < 8 || pos + size > this.data.length) break;
+            if (type === 0x0001) this.parseStringPool(pos, size);
+            else if (type === 0x0102) this.parseElement(pos, hdrSize);
+            pos += size;
         }
     }
     
     parseStringPool(start, size) {
         this.stringPoolSize = size;
-        const stringCount = this.readU32(start + 8);
-        const flags = this.readU32(start + 16);
-        const stringsStart = this.readU32(start + 20);
-        const isUtf8 = (flags & 0x100) !== 0;
+        const count = this.readU32(start + 8), flags = this.readU32(start + 16), strStart = this.readU32(start + 20);
+        const isUtf8 = !!(flags & 0x100);
         this.isUtf8 = isUtf8;
         
-        const offsets = [];
-        for (let i = 0; i < stringCount; i++) offsets.push(this.readU32(start + 28 + i * 4));
-        
-        const stringsDataStart = start + stringsStart;
-        for (let i = 0; i < stringCount; i++) {
-            const strOffset = stringsDataStart + offsets[i];
+        for (let i = 0; i < count; i++) {
+            const off = this.readU32(start + 28 + i * 4);
+            const strOff = start + strStart + off;
             let str = '';
             try {
                 if (isUtf8) {
-                    let p = strOffset;
-                    let charLen = this.data[p++];
-                    if (charLen & 0x80) charLen = ((charLen & 0x7F) << 8) | this.data[p++];
-                    let byteLen = this.data[p++];
-                    if (byteLen & 0x80) byteLen = ((byteLen & 0x7F) << 8) | this.data[p++];
-                    str = new TextDecoder('utf-8').decode(this.data.subarray(p, p + byteLen));
+                    let p = strOff, cLen = this.data[p++];
+                    if (cLen & 0x80) p++;
+                    let bLen = this.data[p++];
+                    if (bLen & 0x80) bLen = ((bLen & 0x7F) << 8) | this.data[p++];
+                    str = new TextDecoder().decode(this.data.subarray(p, p + bLen));
                 } else {
-                    let p = strOffset;
-                    let len = this.data[p] | (this.data[p + 1] << 8);
+                    let p = strOff, len = this.data[p] | (this.data[p+1] << 8);
                     p += 2;
-                    const chars = [];
-                    for (let j = 0; j < len; j++) {
-                        const c = this.data[p] | (this.data[p + 1] << 8);
-                        p += 2;
-                        if (c === 0) break;
-                        chars.push(String.fromCharCode(c));
-                    }
-                    str = chars.join('');
+                    for (let j = 0; j < len; j++) { str += String.fromCharCode(this.data[p] | (this.data[p+1] << 8)); p += 2; }
                 }
-            } catch (e) {}
+            } catch(e) {}
             this.strings.push(str);
         }
     }
     
-    parseStartElement(start, headerSize) {
-        const nameIdx = this.readI32(start + 20);
-        const attrStart = this.readU16(start + 24);
-        const attrSize = this.readU16(start + 26);
-        const attrCount = this.readU16(start + 28);
-        const elemName = this.strings[nameIdx] || '';
-        const attrsOffset = start + 16 + attrStart;
+    parseElement(start, hdrSize) {
+        const nameIdx = this.readI32(start + 20), attrStart = this.readU16(start + 24), attrSize = this.readU16(start + 26), attrCount = this.readU16(start + 28);
+        const elem = this.strings[nameIdx] || '';
+        const attrsOff = start + 16 + attrStart;
         
         for (let i = 0; i < attrCount; i++) {
-            const attrOffset = attrsOffset + i * attrSize;
-            if (attrOffset + 20 > this.data.length) break;
-            const attrNameIdx = this.readI32(attrOffset + 4);
-            const rawValue = this.readI32(attrOffset + 8);
-            const dataType = this.data[attrOffset + 15];
-            const data = this.readI32(attrOffset + 16);
-            const attrName = this.strings[attrNameIdx] || '';
+            const ao = attrsOff + i * attrSize;
+            if (ao + 20 > this.data.length) break;
+            const anIdx = this.readI32(ao + 4), raw = this.readI32(ao + 8), type = this.data[ao + 15], data = this.readI32(ao + 16);
+            const an = this.strings[anIdx] || '';
             
-            if (elemName === 'manifest') {
-                if (attrName === 'package' && dataType === 0x03) {
-                    this.info.package = this.strings[rawValue] || '';
-                    this.info.packageStringIdx = rawValue;
+            if (elem === 'manifest') {
+                if (an === 'package' && type === 0x03) { this.info.package = this.strings[raw] || ''; this.info.packageStringIdx = raw; }
+                if (an === 'versionCode') this.info.versionCode = data;
+                if (an === 'versionName') { if (type === 0x03) { this.info.versionName = this.strings[raw] || ''; this.info.versionNameStringIdx = raw; } else this.info.versionName = String(data); }
+            } else if (elem === 'uses-sdk') {
+                if (an === 'minSdkVersion') this.info.minSdk = data;
+                if (an === 'targetSdkVersion') this.info.targetSdk = data;
+            } else if (elem === 'application') {
+                if (an === 'label') { if (type === 0x03) { this.info.label = this.strings[raw] || ''; this.info.labelStringIdx = raw; } else if (type === 0x01) this.info.label = `@0x${(data>>>0).toString(16)}`; }
+            } else if (elem === 'permission' || elem === 'uses-permission') {
+                if (an === 'name' && type === 0x03 && raw >= 0) {
+                    const permValue = this.strings[raw] || '';
+                    this.permissions.push({ 
+                        stringIdx: raw, 
+                        value: permValue, 
+                        isProtected: isProtectedPermission(permValue) 
+                    });
                 }
-                if (attrName === 'versionCode') this.info.versionCode = data;
-                if (attrName === 'versionName') {
-                    if (dataType === 0x03) { this.info.versionName = this.strings[rawValue] || ''; this.info.versionNameStringIdx = rawValue; }
-                    else this.info.versionName = String(data);
-                }
-            } else if (elemName === 'uses-sdk') {
-                if (attrName === 'minSdkVersion') this.info.minSdk = data;
-                if (attrName === 'targetSdkVersion') this.info.targetSdk = data;
-            } else if (elemName === 'application') {
-                if (attrName === 'label') {
-                    if (dataType === 0x03) { this.info.label = this.strings[rawValue] || ''; this.info.labelStringIdx = rawValue; }
-                    else if (dataType === 0x01) this.info.label = `@0x${(data >>> 0).toString(16)}`;
-                }
-            } else if (elemName === 'permission' || elemName === 'uses-permission') {
-                if (attrName === 'name' && dataType === 0x03 && rawValue >= 0) {
-                    const val = this.strings[rawValue] || '';
-                    this.permissions.push({ stringIdx: rawValue, value: val, isSystem: isSystemPermission(val) });
-                }
-            } else if (elemName === 'provider') {
-                if (attrName === 'authorities' && dataType === 0x03 && rawValue >= 0) {
-                    this.authorities.push({ stringIdx: rawValue, value: this.strings[rawValue] || '' });
-                }
+            } else if (elem === 'provider') {
+                if (an === 'authorities' && type === 0x03 && raw >= 0) this.authorities.push({ stringIdx: raw, value: this.strings[raw] || '' });
             }
         }
     }
@@ -631,689 +882,279 @@ class AXMLModifier {
         this.view = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength);
     }
     
-    readU16(off) { return this.view.getUint16(off, true); }
-    readU32(off) { return this.view.getUint32(off, true); }
+    readU16(o) { return this.view.getUint16(o, true); }
+    readU32(o) { return this.view.getUint32(o, true); }
     
     modifyStrings(changes) {
-        const spSize = this.readU32(12);
-        const stringCount = this.readU32(16);
-        const flags = this.readU32(24);
-        const stringsStart = this.readU32(28);
-        const isUtf8 = (flags & 0x100) !== 0;
-        
+        const spSize = this.readU32(12), count = this.readU32(16), flags = this.readU32(24), strStart = this.readU32(28);
+        const isUtf8 = !!(flags & 0x100);
         const strings = [];
-        const strDataStart = 8 + stringsStart;
-        for (let i = 0; i < stringCount; i++) {
-            const offset = this.readU32(36 + i * 4);
-            const strPos = strDataStart + offset;
+        for (let i = 0; i < count; i++) {
+            const off = this.readU32(36 + i * 4), strOff = 8 + strStart + off;
             let str = '';
             try {
                 if (isUtf8) {
-                    let p = strPos, cLen = this.data[p++];
+                    let p = strOff, cLen = this.data[p++];
                     if (cLen & 0x80) p++;
                     let bLen = this.data[p++];
                     if (bLen & 0x80) bLen = ((bLen & 0x7F) << 8) | this.data[p++];
-                    str = new TextDecoder('utf-8').decode(this.data.subarray(p, p + bLen));
+                    str = new TextDecoder().decode(this.data.subarray(p, p + bLen));
                 } else {
-                    let p = strPos, len = this.data[p] | (this.data[p + 1] << 8);
+                    let p = strOff, len = this.data[p] | (this.data[p+1] << 8);
                     p += 2;
-                    const chars = [];
-                    for (let j = 0; j < len; j++) { chars.push(String.fromCharCode(this.data[p] | (this.data[p + 1] << 8))); p += 2; }
-                    str = chars.join('');
+                    for (let j = 0; j < len; j++) { str += String.fromCharCode(this.data[p] | (this.data[p+1] << 8)); p += 2; }
                 }
-            } catch (e) {}
+            } catch(e) {}
             strings.push(str);
         }
         
-        const changeMap = new Map();
-        for (const c of changes) if (c.idx !== undefined && c.idx >= 0 && c.idx < strings.length) changeMap.set(c.idx, c.val);
-        for (const [idx, val] of changeMap) if (strings[idx] !== val) { log(`String[${idx}]: "${strings[idx].slice(0,40)}" → "${val.slice(0,40)}"`, 'info'); strings[idx] = val; }
+        const m = new Map();
+        for (const c of changes) if (c.idx >= 0 && c.idx < strings.length) m.set(c.idx, c.val);
+        for (const [i, v] of m) if (strings[i] !== v) { log(`String[${i}]: "${strings[i].slice(0,40)}" → "${v.slice(0,40)}"`, 'info'); strings[i] = v; }
         
-        return this.rebuildWithStrings(strings, isUtf8, 8 + spSize);
+        return this.rebuild(strings, isUtf8, 8 + spSize);
     }
     
-    rebuildWithStrings(strings, isUtf8, afterStringPool) {
-        const restData = this.data.subarray(afterStringPool);
-        const stringBytes = [], offsets = [];
-        let currentOffset = 0;
-        for (const str of strings) {
-            offsets.push(currentOffset);
+    rebuild(strings, isUtf8, afterSP) {
+        const rest = this.data.subarray(afterSP);
+        const sBytes = [], offs = [];
+        let cur = 0;
+        for (const s of strings) {
+            offs.push(cur);
             if (isUtf8) {
-                const encoded = new TextEncoder().encode(str);
-                const entry = [];
-                if (str.length > 0x7F) entry.push(((str.length >> 8) & 0x7F) | 0x80, str.length & 0xFF);
-                else entry.push(str.length);
-                if (encoded.length > 0x7F) entry.push(((encoded.length >> 8) & 0x7F) | 0x80, encoded.length & 0xFF);
-                else entry.push(encoded.length);
-                entry.push(...encoded, 0);
-                stringBytes.push(new Uint8Array(entry));
-                currentOffset += entry.length;
+                const enc = new TextEncoder().encode(s);
+                const e = [];
+                if (s.length > 0x7F) e.push(((s.length >> 8) & 0x7F) | 0x80, s.length & 0xFF);
+                else e.push(s.length);
+                if (enc.length > 0x7F) e.push(((enc.length >> 8) & 0x7F) | 0x80, enc.length & 0xFF);
+                else e.push(enc.length);
+                e.push(...enc, 0);
+                sBytes.push(new Uint8Array(e));
+                cur += e.length;
             } else {
-                const entry = [str.length & 0xFF, (str.length >> 8) & 0x7F];
-                for (const char of str) { const code = char.charCodeAt(0); entry.push(code & 0xFF, (code >> 8) & 0xFF); }
-                entry.push(0, 0);
-                stringBytes.push(new Uint8Array(entry));
-                currentOffset += entry.length;
+                const e = [s.length & 0xFF, (s.length >> 8) & 0x7F];
+                for (const c of s) { const code = c.charCodeAt(0); e.push(code & 0xFF, (code >> 8) & 0xFF); }
+                e.push(0, 0);
+                sBytes.push(new Uint8Array(e));
+                cur += e.length;
             }
         }
         
-        const headerSize = 28, offsetsSize = strings.length * 4;
-        const stringsSize = stringBytes.reduce((a, b) => a + b.length, 0);
-        const padding = (4 - (stringsSize % 4)) % 4;
-        const newSpSize = headerSize + offsetsSize + stringsSize + padding;
+        const hdr = 28, offSize = strings.length * 4, strSize = sBytes.reduce((a,b) => a + b.length, 0);
+        const pad = (4 - (strSize % 4)) % 4, spSize = hdr + offSize + strSize + pad;
         
-        const newSp = new Uint8Array(newSpSize);
-        const spView = new DataView(newSp.buffer);
-        spView.setUint16(0, 0x0001, true);
-        spView.setUint16(2, 28, true);
-        spView.setUint32(4, newSpSize, true);
-        spView.setUint32(8, strings.length, true);
-        spView.setUint32(16, isUtf8 ? 0x100 : 0, true);
-        spView.setUint32(20, headerSize + offsetsSize, true);
+        const sp = new Uint8Array(spSize), sv = new DataView(sp.buffer);
+        sv.setUint16(0, 0x0001, true);
+        sv.setUint16(2, 28, true);
+        sv.setUint32(4, spSize, true);
+        sv.setUint32(8, strings.length, true);
+        sv.setUint32(16, isUtf8 ? 0x100 : 0, true);
+        sv.setUint32(20, hdr + offSize, true);
+        for (let i = 0; i < offs.length; i++) sv.setUint32(28 + i * 4, offs[i], true);
+        let wp = hdr + offSize;
+        for (const b of sBytes) { sp.set(b, wp); wp += b.length; }
         
-        for (let i = 0; i < offsets.length; i++) spView.setUint32(28 + i * 4, offsets[i], true);
-        let writePos = headerSize + offsetsSize;
-        for (const bytes of stringBytes) { newSp.set(bytes, writePos); writePos += bytes.length; }
-        
-        const result = new Uint8Array(8 + newSpSize + restData.length);
+        const result = new Uint8Array(8 + spSize + rest.length);
         new DataView(result.buffer).setUint32(0, 0x00080003, true);
         new DataView(result.buffer).setUint32(4, result.length, true);
-        result.set(newSp, 8);
-        result.set(restData, 8 + newSpSize);
+        result.set(sp, 8);
+        result.set(rest, 8 + spSize);
         return result;
     }
     
-    modifyIntAttr(elemName, attrName, newValue) {
-        const parser = new AXMLParser(this.data);
-        const strings = parser.strings;
-        let pos = 8 + parser.stringPoolSize;
+    modifyIntAttr(elem, attr, val) {
+        const p = new AXMLParser(this.data), s = p.strings;
+        let pos = 8 + p.stringPoolSize;
         if (pos + 8 <= this.data.length && this.readU16(pos) === 0x0180) pos += this.readU32(pos + 4);
         while (pos + 8 <= this.data.length) {
-            const chunkType = this.readU16(pos), headerSize = this.readU16(pos + 2), chunkSize = this.readU32(pos + 4);
-            if (chunkSize < 8 || pos + chunkSize > this.data.length) break;
-            if (chunkType === 0x0102) {
-                const nameIdx = this.view.getInt32(pos + 20, true);
-                const attrStart = this.readU16(pos + 24), attrSize = this.readU16(pos + 26), attrCount = this.readU16(pos + 28);
-                if (strings[nameIdx] === elemName) {
-                    const attrsOffset = pos + 16 + attrStart;
-                    for (let i = 0; i < attrCount; i++) {
-                        const attrOffset = attrsOffset + i * attrSize;
-                        if (strings[this.view.getInt32(attrOffset + 4, true)] === attrName) {
-                            this.view.setInt32(attrOffset + 16, newValue, true);
-                            log(`Modified ${elemName}/@${attrName} = ${newValue}`, 'info');
-                            return;
-                        }
+            const type = this.readU16(pos), hdr = this.readU16(pos + 2), size = this.readU32(pos + 4);
+            if (size < 8 || pos + size > this.data.length) break;
+            if (type === 0x0102) {
+                const nIdx = this.view.getInt32(pos + 20, true), aStart = this.readU16(pos + 24), aSize = this.readU16(pos + 26), aCnt = this.readU16(pos + 28);
+                if (s[nIdx] === elem) {
+                    const aOff = pos + 16 + aStart;
+                    for (let i = 0; i < aCnt; i++) {
+                        const ao = aOff + i * aSize;
+                        if (s[this.view.getInt32(ao + 4, true)] === attr) { this.view.setInt32(ao + 16, val, true); log(`Modified ${elem}/@${attr} = ${val}`, 'info'); return; }
                     }
                 }
             }
-            pos += chunkSize;
-        }
-    }
-}
-
-// ========== Deterministic RSA Key Generation ==========
-class DeterministicRSA {
-    constructor(seed) {
-        this.rng = new SeededRandom(seed);
-    }
-    
-    // Miller-Rabin primality test
-    isProbablePrime(n, k = 10) {
-        if (n < 2n) return false;
-        if (n === 2n || n === 3n) return true;
-        if (n % 2n === 0n) return false;
-        
-        let r = 0n, d = n - 1n;
-        while (d % 2n === 0n) { d /= 2n; r++; }
-        
-        for (let i = 0; i < k; i++) {
-            const a = this.randomBigInt(2n, n - 2n);
-            let x = this.modPow(a, d, n);
-            if (x === 1n || x === n - 1n) continue;
-            let composite = true;
-            for (let j = 0n; j < r - 1n; j++) {
-                x = this.modPow(x, 2n, n);
-                if (x === n - 1n) { composite = false; break; }
-            }
-            if (composite) return false;
-        }
-        return true;
-    }
-    
-    modPow(base, exp, mod) {
-        let result = 1n;
-        base = base % mod;
-        while (exp > 0n) {
-            if (exp % 2n === 1n) result = (result * base) % mod;
-            exp = exp / 2n;
-            base = (base * base) % mod;
-        }
-        return result;
-    }
-    
-    randomBigInt(min, max) {
-        const range = max - min + 1n;
-        const bits = range.toString(2).length;
-        const bytes = Math.ceil(bits / 8);
-        let result;
-        do {
-            const arr = this.rng.bytes(bytes);
-            result = BigInt('0x' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join(''));
-        } while (result >= range);
-        return min + result;
-    }
-    
-    generatePrime(bits) {
-        const bytes = Math.ceil(bits / 8);
-        while (true) {
-            const arr = this.rng.bytes(bytes);
-            arr[0] |= 0x80; // Ensure high bit set
-            arr[bytes - 1] |= 0x01; // Ensure odd
-            let n = BigInt('0x' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join(''));
-            // Trim to exact bits
-            const mask = (1n << BigInt(bits)) - 1n;
-            n = n & mask;
-            n |= (1n << BigInt(bits - 1)); // Ensure high bit
-            n |= 1n; // Ensure odd
-            if (this.isProbablePrime(n)) return n;
-        }
-    }
-    
-    modInverse(a, m) {
-        let [old_r, r] = [a, m];
-        let [old_s, s] = [1n, 0n];
-        while (r !== 0n) {
-            const q = old_r / r;
-            [old_r, r] = [r, old_r - q * r];
-            [old_s, s] = [s, old_s - q * s];
-        }
-        if (old_r !== 1n) throw new Error('No inverse');
-        return ((old_s % m) + m) % m;
-    }
-    
-    async generate() {
-        log('Generating deterministic RSA-2048 key pair...', 'info');
-        
-        const p = this.generatePrime(1024);
-        const q = this.generatePrime(1024);
-        const n = p * q;
-        const phi = (p - 1n) * (q - 1n);
-        const e = 65537n;
-        const d = this.modInverse(e, phi);
-        
-        // Build PKCS#1 private key structure for import
-        // We'll export as JWK for WebCrypto import
-        const nBytes = this.bigIntToBytes(n, 256);
-        const eBytes = this.bigIntToBytes(e, 3);
-        const dBytes = this.bigIntToBytes(d, 256);
-        const pBytes = this.bigIntToBytes(p, 128);
-        const qBytes = this.bigIntToBytes(q, 128);
-        const dpBytes = this.bigIntToBytes(d % (p - 1n), 128);
-        const dqBytes = this.bigIntToBytes(d % (q - 1n), 128);
-        const qiBytes = this.bigIntToBytes(this.modInverse(q, p), 128);
-        
-        const b64url = arr => btoa(String.fromCharCode(...arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        
-        const jwk = {
-            kty: 'RSA',
-            n: b64url(nBytes),
-            e: b64url(eBytes),
-            d: b64url(dBytes),
-            p: b64url(pBytes),
-            q: b64url(qBytes),
-            dp: b64url(dpBytes),
-            dq: b64url(dqBytes),
-            qi: b64url(qiBytes),
-            alg: 'RS256',
-            ext: true
-        };
-        
-        const privateKey = await crypto.subtle.importKey(
-            'jwk', jwk,
-            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-            true, ['sign']
-        );
-        
-        const publicKey = await crypto.subtle.importKey(
-            'jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
-            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-            true, ['verify']
-        );
-        
-        const publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
-        
-        log('Deterministic key pair generated', 'success');
-        return { privateKey, publicKey, publicKeyDer };
-    }
-    
-    bigIntToBytes(n, length) {
-        const hex = n.toString(16).padStart(length * 2, '0');
-        const bytes = new Uint8Array(length);
-        for (let i = 0; i < length; i++) {
-            bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-        }
-        return bytes;
-    }
-}
-
-// ========== JKS/P12 Parser ==========
-class KeystoreParser {
-    static async parseJKS(buffer, storePass, keyAlias, keyPass) {
-        const view = new DataView(buffer);
-        const magic = view.getUint32(0, false);
-        
-        if (magic === 0xFEEDFEED) {
-            return await this.parseJKSFormat(buffer, storePass, keyAlias, keyPass);
-        } else {
-            // Try PKCS12
-            return await this.parsePKCS12(buffer, storePass, keyAlias, keyPass);
-        }
-    }
-    
-    static async parseJKSFormat(buffer, storePass, keyAlias, keyPass) {
-        log('Parsing JKS format...', 'info');
-        const data = new Uint8Array(buffer);
-        const view = new DataView(buffer);
-        
-        // JKS Magic: 0xFEEDFEED
-        // Version: 4 bytes
-        // Entry count: 4 bytes
-        let pos = 8;
-        const entryCount = view.getInt32(pos, false);
-        pos += 4;
-        
-        log(`JKS contains ${entryCount} entries`, 'info');
-        
-        for (let i = 0; i < entryCount; i++) {
-            const tag = view.getInt32(pos, false);
-            pos += 4;
-            
-            const aliasLen = view.getInt16(pos, false);
-            pos += 2;
-            const alias = new TextDecoder().decode(data.subarray(pos, pos + aliasLen));
-            pos += aliasLen;
-            
-            // Timestamp (8 bytes)
-            pos += 8;
-            
-            if (tag === 1) { // Private key entry
-                if (alias.toLowerCase() === keyAlias.toLowerCase()) {
-                    log(`Found key alias: ${alias}`, 'success');
-                    
-                    // Encrypted private key length
-                    const keyLen = view.getInt32(pos, false);
-                    pos += 4;
-                    const encryptedKey = data.subarray(pos, pos + keyLen);
-                    pos += keyLen;
-                    
-                    // Certificate chain
-                    const certChainLen = view.getInt32(pos, false);
-                    pos += 4;
-                    
-                    const certs = [];
-                    for (let j = 0; j < certChainLen; j++) {
-                        const certTypeLen = view.getInt16(pos, false);
-                        pos += 2;
-                        pos += certTypeLen; // Skip cert type string
-                        
-                        const certLen = view.getInt32(pos, false);
-                        pos += 4;
-                        certs.push(data.subarray(pos, pos + certLen));
-                        pos += certLen;
-                    }
-                    
-                    // Decrypt the private key
-                    const decryptedKey = await this.decryptJKSPrivateKey(encryptedKey, keyPass || storePass);
-                    
-                    return {
-                        privateKeyDer: decryptedKey,
-                        certificateDer: certs[0],
-                        certificates: certs
-                    };
-                } else {
-                    // Skip this entry
-                    const keyLen = view.getInt32(pos, false);
-                    pos += 4 + keyLen;
-                    const certChainLen = view.getInt32(pos, false);
-                    pos += 4;
-                    for (let j = 0; j < certChainLen; j++) {
-                        const certTypeLen = view.getInt16(pos, false);
-                        pos += 2 + certTypeLen;
-                        const certLen = view.getInt32(pos, false);
-                        pos += 4 + certLen;
-                    }
-                }
-            } else if (tag === 2) { // Trusted cert
-                const certTypeLen = view.getInt16(pos, false);
-                pos += 2 + certTypeLen;
-                const certLen = view.getInt32(pos, false);
-                pos += 4 + certLen;
-            }
-        }
-        
-        throw new Error(`Key alias "${keyAlias}" not found in keystore`);
-    }
-    
-    static async decryptJKSPrivateKey(encrypted, password) {
-        // JKS uses a custom PBE scheme
-        // The key is encrypted using password-derived XOR stream
-        const passwordBytes = new TextEncoder().encode(password);
-        const salt = encrypted.subarray(0, 20);
-        const encData = encrypted.subarray(20, encrypted.length - 20);
-        const storedCheck = encrypted.subarray(encrypted.length - 20);
-        
-        // Generate keystream using SHA1
-        let xorKey = new Uint8Array(0);
-        let digest = new Uint8Array([...passwordBytes, ...new TextEncoder().encode('Mighty Aphrodite'), ...salt]);
-        
-        while (xorKey.length < encData.length) {
-            const hashBuffer = await crypto.subtle.digest('SHA-1', digest);
-            const hash = new Uint8Array(hashBuffer);
-            const newXorKey = new Uint8Array(xorKey.length + hash.length);
-            newXorKey.set(xorKey);
-            newXorKey.set(hash, xorKey.length);
-            xorKey = newXorKey;
-            digest = new Uint8Array([...passwordBytes, ...hash]);
-        }
-        
-        // XOR to decrypt
-        const decrypted = new Uint8Array(encData.length);
-        for (let i = 0; i < encData.length; i++) {
-            decrypted[i] = encData[i] ^ xorKey[i];
-        }
-        
-        // Verify checksum
-        const checkData = new Uint8Array([...passwordBytes, ...decrypted]);
-        const checkHash = new Uint8Array(await crypto.subtle.digest('SHA-1', checkData));
-        
-        let valid = true;
-        for (let i = 0; i < 20; i++) {
-            if (checkHash[i] !== storedCheck[i]) valid = false;
-        }
-        
-        if (!valid) {
-            throw new Error('Invalid key password or corrupted keystore');
-        }
-        
-        return decrypted;
-    }
-    
-    static async parsePKCS12(buffer, password, keyAlias, keyPass) {
-        log('PKCS12 parsing is complex; using WebCrypto workaround...', 'warn');
-        throw new Error('PKCS12 format requires server-side processing or a specialized library. Please use JKS format or generate a new key.');
-    }
-    
-    static async importPrivateKey(derBytes) {
-        // Parse PKCS#8 private key
-        try {
-            return await crypto.subtle.importKey(
-                'pkcs8',
-                derBytes,
-                { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-                true,
-                ['sign']
-            );
-        } catch (e) {
-            log(`Failed to import private key: ${e.message}`, 'error');
-            throw e;
+            pos += size;
         }
     }
 }
 
 // ========== APK Signer ==========
 class APKSigner {
-    constructor() {
-        this.privateKey = null;
-        this.publicKeyDer = null;
-        this.certificate = null;
-    }
+    constructor() { this.privateKey = null; this.publicKeyDer = null; this.certificate = null; }
     
-    concat(...arrays) {
-        const filtered = arrays.filter(a => a && a.length);
-        const result = new Uint8Array(filtered.reduce((s, a) => s + a.length, 0));
-        let offset = 0;
-        for (const arr of filtered) { result.set(arr, offset); offset += arr.length; }
-        return result;
-    }
-    
-    derLen(len) {
-        if (len < 128) return new Uint8Array([len]);
-        if (len < 256) return new Uint8Array([0x81, len]);
-        return new Uint8Array([0x82, (len >> 8) & 0xFF, len & 0xFF]);
-    }
-    derSeq(...items) { const c = this.concat(...items); return this.concat(new Uint8Array([0x30]), this.derLen(c.length), c); }
-    derSet(...items) { const c = this.concat(...items); return this.concat(new Uint8Array([0x31]), this.derLen(c.length), c); }
-    derInt(bytes) {
-        let a = bytes instanceof Uint8Array ? bytes : new Uint8Array([bytes]);
-        while (a.length > 1 && a[0] === 0 && !(a[1] & 0x80)) a = a.slice(1);
-        if (a[0] & 0x80) a = this.concat(new Uint8Array([0]), a);
-        return this.concat(new Uint8Array([0x02]), this.derLen(a.length), a);
-    }
+    concat(...a) { const f = a.filter(x => x && x.length), r = new Uint8Array(f.reduce((s,x) => s + x.length, 0)); let o = 0; for (const x of f) { r.set(x, o); o += x.length; } return r; }
+    derLen(n) { if (n < 128) return new Uint8Array([n]); if (n < 256) return new Uint8Array([0x81, n]); return new Uint8Array([0x82, (n >> 8) & 0xFF, n & 0xFF]); }
+    derSeq(...i) { const c = this.concat(...i); return this.concat(new Uint8Array([0x30]), this.derLen(c.length), c); }
+    derSet(...i) { const c = this.concat(...i); return this.concat(new Uint8Array([0x31]), this.derLen(c.length), c); }
+    derInt(b) { let a = b instanceof Uint8Array ? b : new Uint8Array([b]); while (a.length > 1 && a[0] === 0 && !(a[1] & 0x80)) a = a.slice(1); if (a[0] & 0x80) a = this.concat(new Uint8Array([0]), a); return this.concat(new Uint8Array([0x02]), this.derLen(a.length), a); }
     derBits(b) { return this.concat(new Uint8Array([0x03]), this.derLen(b.length + 1), new Uint8Array([0]), b); }
     derOcts(b) { return this.concat(new Uint8Array([0x04]), this.derLen(b.length), b); }
-    derOid(oid) {
-        const p = oid.split('.').map(Number);
-        const b = [p[0] * 40 + p[1]];
-        for (let i = 2; i < p.length; i++) {
-            let v = p[i];
-            if (v === 0) { b.push(0); continue; }
-            const o = [];
-            while (v > 0) { o.unshift(v & 0x7F); v >>>= 7; }
-            for (let j = 0; j < o.length - 1; j++) o[j] |= 0x80;
-            b.push(...o);
-        }
-        return this.concat(new Uint8Array([0x06, b.length]), new Uint8Array(b));
-    }
+    derOid(oid) { const p = oid.split('.').map(Number), b = [p[0] * 40 + p[1]]; for (let i = 2; i < p.length; i++) { let v = p[i]; if (v === 0) { b.push(0); continue; } const o = []; while (v > 0) { o.unshift(v & 0x7F); v >>>= 7; } for (let j = 0; j < o.length - 1; j++) o[j] |= 0x80; b.push(...o); } return this.concat(new Uint8Array([0x06, b.length]), new Uint8Array(b)); }
     derUtf8(s) { const b = new TextEncoder().encode(s); return this.concat(new Uint8Array([0x0C]), this.derLen(b.length), b); }
-    derUtc(d) {
-        const pad = n => n.toString().padStart(2, '0');
-        const s = `${pad(d.getUTCFullYear() % 100)}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
-        return this.concat(new Uint8Array([0x17, s.length]), new TextEncoder().encode(s));
-    }
+    derUtc(d) { const pad = n => n.toString().padStart(2, '0'); const s = `${pad(d.getUTCFullYear() % 100)}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; return this.concat(new Uint8Array([0x17, s.length]), new TextEncoder().encode(s)); }
     
     async generateFromSeed(seed, cn) {
-        log(`Generating key from seed: ${seed.slice(0, 16)}...`, 'info');
-        
+        log(`Using signing seed: ${seed}`, 'info');
         const rsa = new DeterministicRSA(seed);
-        const { privateKey, publicKey, publicKeyDer } = await rsa.generate();
-        
+        const { privateKey, publicKeyDer } = await rsa.generate();
         this.privateKey = privateKey;
         this.publicKeyDer = publicKeyDer;
-        
-        // Create certificate
-        await this.createCertificate(cn, privateKey, publicKeyDer);
+        await this.createCert(cn, privateKey, publicKeyDer, seed);
     }
     
-    async loadFromKeystore(keystoreBuffer, storePass, keyAlias, keyPass) {
-        log('Loading key from keystore...', 'info');
+    async createCert(cn, privKey, pubKeyDer, seed) {
+        // *** CRITICAL FIX: Use deterministic dates based on seed ***
+        // This ensures the same seed always produces the exact same certificate
+        const r = new SeededRandom(seed + ':cert:dates:v2');
         
-        const result = await KeystoreParser.parseJKS(keystoreBuffer, storePass, keyAlias, keyPass);
+        // Fixed base date: 2024-01-01 00:00:00 UTC
+        // Add small deterministic offset for uniqueness per seed
+        const baseTime = Date.UTC(2024, 0, 1, 0, 0, 0);
+        const offsetDays = r.int(0, 30); // 0-30 days offset
+        const now = new Date(baseTime + offsetDays * 24 * 60 * 60 * 1000);
+        const later = new Date(now.getTime() + 25 * 365 * 24 * 60 * 60 * 1000);
         
-        this.privateKey = await KeystoreParser.importPrivateKey(result.privateKeyDer);
-        this.certificate = result.certificateDer;
+        // Deterministic serial from seed
+        const serialBytes = new Uint8Array(16);
+        const serialRng = new SeededRandom(seed + ':serial:v2');
+        for (let i = 0; i < 16; i++) serialBytes[i] = serialRng.int(0, 255);
+        serialBytes[0] &= 0x7F; // Ensure positive
         
-        // Extract public key from certificate
-        // For simplicity, we'll regenerate it from the private key
-        const publicKeyJwk = await crypto.subtle.exportKey('jwk', this.privateKey);
-        const publicKey = await crypto.subtle.importKey(
-            'jwk',
-            { kty: publicKeyJwk.kty, n: publicKeyJwk.n, e: publicKeyJwk.e, alg: 'RS256', ext: true },
-            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-            true, ['verify']
-        );
-        this.publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
-        
-        log('Keystore loaded successfully', 'success');
-    }
-    
-    async createCertificate(cn, privateKey, publicKeyDer) {
-        const now = new Date();
-        const notAfter = new Date(now.getTime() + 25 * 365 * 24 * 60 * 60 * 1000);
-        const serial = new Uint8Array(16);
-        new SeededRandom(cn).bytes(16).forEach((v, i) => serial[i] = v);
-        serial[0] &= 0x7F;
-        
-        const sha256Rsa = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
+        const alg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
         const issuer = this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8(cn))));
-        const validity = this.derSeq(this.derUtc(now), this.derUtc(notAfter));
-        
-        const extensions = this.derSeq(
+        const validity = this.derSeq(this.derUtc(now), this.derUtc(later));
+        const ext = this.derSeq(
             this.derSeq(this.derOid('2.5.29.19'), new Uint8Array([0x01, 0x01, 0xFF]), this.derOcts(this.derSeq())),
             this.derSeq(this.derOid('2.5.29.15'), new Uint8Array([0x01, 0x01, 0xFF]), this.derOcts(new Uint8Array([0x03, 0x02, 0x07, 0x80])))
         );
-        const extensionsCtx = this.concat(new Uint8Array([0xA3]), this.derLen(extensions.length), extensions);
+        const extCtx = this.concat(new Uint8Array([0xA3]), this.derLen(ext.length), ext);
         
-        const tbs = this.derSeq(
-            new Uint8Array([0xA0, 0x03, 0x02, 0x01, 0x02]),
-            this.derInt(serial),
-            sha256Rsa, issuer, validity, issuer,
-            publicKeyDer,
-            extensionsCtx
-        );
-        
-        const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, tbs));
-        this.certificate = this.derSeq(tbs, sha256Rsa, this.derBits(signature));
-        
-        log(`Certificate generated: ${this.certificate.length} bytes`, 'success');
+        const tbs = this.derSeq(new Uint8Array([0xA0, 0x03, 0x02, 0x01, 0x02]), this.derInt(serialBytes), alg, issuer, validity, issuer, pubKeyDer, extCtx);
+        const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privKey, tbs));
+        this.certificate = this.derSeq(tbs, alg, this.derBits(sig));
+        log(`Certificate: ${this.certificate.length} bytes (deterministic)`, 'success');
     }
     
     async signV1(files) {
-        log('Creating V1 (JAR) signature...', 'info');
-        
+        log('Creating V1 signature...', 'info');
         const mfLines = ['Manifest-Version: 1.0', 'Created-By: APK Editor', ''];
-        for (const f of files) {
-            if (f.name.startsWith('META-INF/')) continue;
-            const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', f.data));
-            mfLines.push(`Name: ${f.name}`, `SHA-256-Digest: ${btoa(String.fromCharCode(...digest))}`, '');
-        }
+        for (const f of files) { if (f.name.startsWith('META-INF/')) continue; const d = new Uint8Array(await crypto.subtle.digest('SHA-256', f.data)); mfLines.push(`Name: ${f.name}`, `SHA-256-Digest: ${btoa(String.fromCharCode(...d))}`, ''); }
         const mf = new TextEncoder().encode(mfLines.join('\r\n'));
-        
-        const mfDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', mf));
-        const sfLines = ['Signature-Version: 1.0', `SHA-256-Digest-Manifest: ${btoa(String.fromCharCode(...mfDigest))}`, 'Created-By: APK Editor', ''];
-        const sf = new TextEncoder().encode(sfLines.join('\r\n'));
-        
+        const mfD = new Uint8Array(await crypto.subtle.digest('SHA-256', mf));
+        const sf = new TextEncoder().encode(['Signature-Version: 1.0', `SHA-256-Digest-Manifest: ${btoa(String.fromCharCode(...mfD))}`, 'Created-By: APK Editor', ''].join('\r\n'));
         const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, sf));
         
-        const digestAlg = this.derSeq(this.derOid('2.16.840.1.101.3.4.2.1'), new Uint8Array([0x05, 0x00]));
-        const sigAlg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
-        const issuerAndSerial = this.derSeq(
-            this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8('CN')))),
-            this.derInt(new Uint8Array([1]))
-        );
-        const signerInfo = this.derSeq(this.derInt(new Uint8Array([1])), issuerAndSerial, digestAlg, sigAlg, this.derOcts(sig));
-        const signedData = this.derSeq(
-            this.derInt(new Uint8Array([1])), this.derSet(digestAlg),
-            this.derSeq(this.derOid('1.2.840.113549.1.7.1')),
-            this.concat(new Uint8Array([0xA0]), this.derLen(this.certificate.length), this.certificate),
-            this.derSet(signerInfo)
-        );
-        const pkcs7 = this.derSeq(
-            this.derOid('1.2.840.113549.1.7.2'),
-            this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData)
-        );
-        
+        const dAlg = this.derSeq(this.derOid('2.16.840.1.101.3.4.2.1'), new Uint8Array([0x05, 0x00]));
+        const sAlg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
+        const issuerSerial = this.derSeq(this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8('CN')))), this.derInt(new Uint8Array([1])));
+        const signerInfo = this.derSeq(this.derInt(new Uint8Array([1])), issuerSerial, dAlg, sAlg, this.derOcts(sig));
+        const signedData = this.derSeq(this.derInt(new Uint8Array([1])), this.derSet(dAlg), this.derSeq(this.derOid('1.2.840.113549.1.7.1')), this.concat(new Uint8Array([0xA0]), this.derLen(this.certificate.length), this.certificate), this.derSet(signerInfo));
+        const pkcs7 = this.derSeq(this.derOid('1.2.840.113549.1.7.2'), this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData));
         return { mf, sf, rsa: pkcs7 };
     }
     
-    async signV2(apkBytes) {
+    async signV2(apk) {
         log('Creating V2 signature...', 'info');
-        const apk = apkBytes instanceof Uint8Array ? apkBytes : new Uint8Array(apkBytes);
         const view = new DataView(apk.buffer, apk.byteOffset, apk.byteLength);
+        let eocd = -1;
+        for (let i = apk.length - 22; i >= Math.max(0, apk.length - 65557); i--) if (view.getUint32(i, true) === 0x06054B50) { eocd = i; break; }
+        if (eocd < 0) throw new Error('EOCD not found');
         
-        let eocdOffset = -1;
-        for (let i = apk.length - 22; i >= Math.max(0, apk.length - 65557); i--) {
-            if (view.getUint32(i, true) === 0x06054B50) { eocdOffset = i; break; }
-        }
-        if (eocdOffset < 0) throw new Error('EOCD not found');
+        const cdOff = view.getUint32(eocd + 16, true);
+        const s1 = apk.slice(0, cdOff), s3 = apk.slice(cdOff, eocd), s4 = apk.slice(eocd);
         
-        const cdOffset = view.getUint32(eocdOffset + 16, true);
-        const section1 = apk.slice(0, cdOffset);
-        const section3 = apk.slice(cdOffset, eocdOffset);
-        const section4 = apk.slice(eocdOffset);
+        const chunks = [];
+        const hash = async d => { for (let i = 0; i < d.length; i += 1048576) { const c = d.slice(i, Math.min(i + 1048576, d.length)), p = new Uint8Array(5 + c.length); p[0] = 0xA5; new DataView(p.buffer).setUint32(1, c.length, true); p.set(c, 5); chunks.push(new Uint8Array(await crypto.subtle.digest('SHA-256', p))); } };
+        await hash(s1); await hash(s3); await hash(s4);
         
-        const CHUNK_SIZE = 1024 * 1024;
-        const chunkDigests = [];
-        const processChunks = async (data) => {
-            for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-                const chunk = data.slice(i, Math.min(i + CHUNK_SIZE, data.length));
-                const prefixed = new Uint8Array(5 + chunk.length);
-                prefixed[0] = 0xA5;
-                new DataView(prefixed.buffer).setUint32(1, chunk.length, true);
-                prefixed.set(chunk, 5);
-                chunkDigests.push(new Uint8Array(await crypto.subtle.digest('SHA-256', prefixed)));
-            }
-        };
-        await processChunks(section1);
-        await processChunks(section3);
-        await processChunks(section4);
+        const all = new Uint8Array(chunks.length * 32);
+        chunks.forEach((c, i) => all.set(c, i * 32));
+        const top = new Uint8Array(5 + all.length);
+        top[0] = 0x5A;
+        new DataView(top.buffer).setUint32(1, chunks.length, true);
+        top.set(all, 5);
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', top));
         
-        const allDigests = new Uint8Array(chunkDigests.length * 32);
-        chunkDigests.forEach((d, i) => allDigests.set(d, i * 32));
-        const topPrefix = new Uint8Array(5 + allDigests.length);
-        topPrefix[0] = 0x5A;
-        new DataView(topPrefix.buffer).setUint32(1, chunkDigests.length, true);
-        topPrefix.set(allDigests, 5);
-        const contentDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', topPrefix));
+        const lp = d => { const r = new Uint8Array(4 + d.length); new DataView(r.buffer).setUint32(0, d.length, true); r.set(d, 4); return r; };
+        const u32 = v => { const r = new Uint8Array(4); new DataView(r.buffer).setUint32(0, v, true); return r; };
         
-        const lp = (data) => { const r = new Uint8Array(4 + data.length); new DataView(r.buffer).setUint32(0, data.length, true); r.set(data, 4); return r; };
-        const u32 = (val) => { const r = new Uint8Array(4); new DataView(r.buffer).setUint32(0, val, true); return r; };
+        const dEntry = this.concat(u32(0x0103), lp(digest));
+        const digests = lp(lp(dEntry));
+        const certs = lp(lp(this.certificate));
+        const signedData = this.concat(digests, certs, lp(new Uint8Array(0)));
+        const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, signedData));
+        const sEntry = this.concat(u32(0x0103), lp(sig));
+        const signer = this.concat(lp(signedData), lp(lp(sEntry)), lp(this.publicKeyDer));
+        const signers = lp(lp(signer));
         
-        const digestEntry = this.concat(u32(0x0103), lp(contentDigest));
-        const digests = lp(lp(digestEntry));
-        const certificates = lp(lp(this.certificate));
-        const signedDataContent = this.concat(digests, certificates, lp(new Uint8Array(0)));
-        
-        const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, signedDataContent));
-        const signatureEntry = this.concat(u32(0x0103), lp(signature));
-        const signer = this.concat(lp(signedDataContent), lp(lp(signatureEntry)), lp(this.publicKeyDer));
-        const signersValue = lp(lp(signer));
-        
-        const pairPayloadSize = 4 + signersValue.length;
-        const pair = new Uint8Array(8 + 4 + signersValue.length);
-        new DataView(pair.buffer).setBigUint64(0, BigInt(pairPayloadSize), true);
+        const pairSize = 4 + signers.length;
+        const pair = new Uint8Array(8 + 4 + signers.length);
+        new DataView(pair.buffer).setBigUint64(0, BigInt(pairSize), true);
         new DataView(pair.buffer).setUint32(8, 0x7109871A, true);
-        pair.set(signersValue, 12);
+        pair.set(signers, 12);
         
         const magic = new TextEncoder().encode('APK Sig Block 42');
-        const blockSizeValue = pair.length + 8 + magic.length;
-        const signingBlock = new Uint8Array(8 + pair.length + 8 + 16);
-        new DataView(signingBlock.buffer).setBigUint64(0, BigInt(blockSizeValue), true);
-        signingBlock.set(pair, 8);
-        new DataView(signingBlock.buffer).setBigUint64(8 + pair.length, BigInt(blockSizeValue), true);
-        signingBlock.set(magic, 8 + pair.length + 8);
+        const blockSize = pair.length + 8 + 16;
+        const block = new Uint8Array(8 + pair.length + 8 + 16);
+        new DataView(block.buffer).setBigUint64(0, BigInt(blockSize), true);
+        block.set(pair, 8);
+        new DataView(block.buffer).setBigUint64(8 + pair.length, BigInt(blockSize), true);
+        block.set(magic, 8 + pair.length + 8);
         
-        const newCdOffset = section1.length + signingBlock.length;
-        const newApk = new Uint8Array(section1.length + signingBlock.length + section3.length + section4.length);
-        newApk.set(section1, 0);
-        newApk.set(signingBlock, section1.length);
-        newApk.set(section3, section1.length + signingBlock.length);
-        newApk.set(section4, section1.length + signingBlock.length + section3.length);
+        const newCd = s1.length + block.length;
+        const result = new Uint8Array(s1.length + block.length + s3.length + s4.length);
+        result.set(s1, 0);
+        result.set(block, s1.length);
+        result.set(s3, s1.length + block.length);
+        result.set(s4, s1.length + block.length + s3.length);
+        new DataView(result.buffer).setUint32(s1.length + block.length + s3.length + 16, newCd, true);
         
-        new DataView(newApk.buffer).setUint32(section1.length + signingBlock.length + section3.length + 16, newCdOffset, true);
-        
-        log(`V2 signed APK: ${newApk.length} bytes`, 'success');
-        return newApk;
+        log(`V2 signed: ${result.length} bytes`, 'success');
+        return result;
     }
 }
 
 // ========== Permission Changes ==========
 function computePermissionChanges(parser, oldPkg, newPkg) {
     const changes = [];
-    for (const perm of parser.permissions) {
-        if (perm.isSystem) continue;
-        if (perm.value.includes(oldPkg)) {
-            changes.push({ idx: perm.stringIdx, val: perm.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) });
-        } else if (perm.value.includes('_PERMISSION') || perm.value.includes('.permission.')) {
-            changes.push({ idx: perm.stringIdx, val: perm.value + '_aee' });
+    let skippedCount = 0;
+    
+    for (const p of parser.permissions) {
+        // Skip ALL protected permissions (system + vendor)
+        if (p.isProtected) {
+            skippedCount++;
+            continue;
+        }
+        
+        // Only modify permissions that contain the original package name
+        if (p.value.includes(oldPkg)) {
+            changes.push({ 
+                idx: p.stringIdx, 
+                val: p.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) 
+            });
         }
     }
-    for (const auth of parser.authorities) {
-        if (auth.value.includes(oldPkg)) {
-            changes.push({ idx: auth.stringIdx, val: auth.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) });
-        } else {
-            changes.push({ idx: auth.stringIdx, val: 'aee_' + auth.value });
+    
+    // Handle authorities (providers)
+    for (const a of parser.authorities) {
+        if (a.value.includes(oldPkg)) {
+            changes.push({ 
+                idx: a.stringIdx, 
+                val: a.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) 
+            });
         }
     }
+    
+    if (skippedCount > 0) {
+        log(`Skipped ${skippedCount} protected permissions (system/vendor)`, 'info');
+    }
+    
     return changes;
 }
 
@@ -1321,7 +1162,6 @@ function computePermissionChanges(parser, oldPkg, newPkg) {
 let currentApk = null, currentParser = null, apkFiles = null;
 const modes = { package: 'derived', versionCode: 'keep', versionName: 'keep', appName: 'keep', signing: 'derived' };
 
-// Mode buttons
 document.querySelectorAll('.option-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         this.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
@@ -1333,7 +1173,6 @@ document.querySelectorAll('.option-btn').forEach(btn => {
             $('signingCustom').style.display = this.dataset.mode === 'custom' ? 'block' : 'none';
             $('signingJks').style.display = this.dataset.mode === 'jks' ? 'block' : 'none';
         }
-        
         updateFields();
     });
 });
@@ -1344,15 +1183,13 @@ $('newPackage').addEventListener('input', updateSigningSeed);
 
 function updateSigningSeed() {
     const masterKey = $('masterSigningKey').value;
-    const pkg = $('newPackage').value || (currentParser?.info?.package || '');
-    const seed = deriveSigningSeed(masterKey, pkg);
-    $('derivedSigningSeed').textContent = seed;
+    const pkg = $('newPackage').value || currentParser?.info?.package || '';
+    $('derivedSigningSeed').textContent = deriveSigningSeed(masterKey, pkg);
 }
 
 function updateFields() {
     if (!currentParser) return;
-    const seed = $('randomSeed').value;
-    const info = currentParser.info;
+    const seed = $('randomSeed').value, info = currentParser.info;
     
     if (modes.package === 'derived') $('newPackage').value = derivePackage(info.package || '', seed);
     else if (modes.package === 'keep') $('newPackage').value = info.package || '';
@@ -1366,9 +1203,7 @@ function updateFields() {
     updateSigningSeed();
 }
 
-// File handling
-const uploadZone = $('uploadZone');
-const fileInput = $('apkFile');
+const uploadZone = $('uploadZone'), fileInput = $('apkFile');
 uploadZone.addEventListener('click', () => fileInput.click());
 uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
@@ -1387,28 +1222,33 @@ async function handleFile(file) {
         const zip = new ZipReader(currentApk);
         log(`ZIP entries: ${zip.entries.size}`, 'info');
         
-        const manifestData = await zip.getEntry('AndroidManifest.xml');
-        if (!manifestData) throw new Error('AndroidManifest.xml not found');
+        const manifest = await zip.getEntry('AndroidManifest.xml');
+        if (!manifest) throw new Error('AndroidManifest.xml not found');
         
-        currentParser = new AXMLParser(manifestData);
+        currentParser = new AXMLParser(manifest);
         
         apkFiles = new Map();
         for (const [name] of zip.entries) {
-            try { const data = await zip.getEntry(name); if (data) apkFiles.set(name, data); }
-            catch (e) { log(`Warning: Could not read ${name}`, 'warn'); }
+            try { const d = await zip.getEntry(name); if (d) apkFiles.set(name, d); }
+            catch (e) { log(`Skip: ${name}`, 'warn'); }
         }
         
         const info = currentParser.info;
-        $('origPackage').textContent = info.package || 'Unknown';
-        $('origVersionCode').textContent = info.versionCode ?? 'Unknown';
-        $('origVersionName').textContent = info.versionName || 'Unknown';
-        $('origLabel').textContent = info.label || 'Unknown';
-        $('origMinSdk').textContent = info.minSdk ?? 'Unknown';
-        $('origTargetSdk').textContent = info.targetSdk ?? 'Unknown';
+        $('origPackage').textContent = info.package || '?';
+        $('origVersionCode').textContent = info.versionCode ?? '?';
+        $('origVersionName').textContent = info.versionName || '?';
+        $('origLabel').textContent = info.label || '?';
+        $('origMinSdk').textContent = info.minSdk ?? '?';
+        $('origTargetSdk').textContent = info.targetSdk ?? '?';
         
         log(`Package: ${info.package}`, 'success');
         log(`Version: ${info.versionCode} (${info.versionName})`, 'success');
         log(`SDK: min=${info.minSdk}, target=${info.targetSdk}`, 'success');
+        
+        // Log permission stats
+        const protectedPerms = currentParser.permissions.filter(p => p.isProtected).length;
+        const customPerms = currentParser.permissions.length - protectedPerms;
+        log(`Permissions: ${customPerms} custom, ${protectedPerms} protected (system/vendor)`, 'info');
         
         $('apkInfo').style.display = 'block';
         $('editCard').style.display = 'block';
@@ -1419,9 +1259,8 @@ async function handleFile(file) {
     }
 }
 
-// Repack
 $('repackBtn').addEventListener('click', async () => {
-    if (!currentApk || !currentParser) { alert('Please load an APK first'); return; }
+    if (!currentApk || !currentParser) { alert('Load APK first'); return; }
     
     $('repackBtn').disabled = true;
     $('progressContainer').style.display = 'block';
@@ -1430,92 +1269,82 @@ $('repackBtn').addEventListener('click', async () => {
         setProgress(5, 'Preparing...');
         
         const info = currentParser.info;
-        const oldPkg = info.package || '';
-        const newPkg = $('newPackage').value || oldPkg;
+        const oldPkg = info.package || '', newPkg = $('newPackage').value || oldPkg;
         const newVC = parseInt($('newVersionCode').value) || info.versionCode || 1;
         const newVN = $('newVersionName').value || info.versionName || '1.0';
         const renamePerms = $('renamePermissions').checked;
         
-        log(`New package: ${newPkg}`, 'info');
-        log(`New version: ${newVC} (${newVN})`, 'info');
+        log(`Package: ${newPkg}`, 'info');
+        log(`Version: ${newVC} (${newVN})`, 'info');
         
         setProgress(10, 'Modifying manifest...');
         
         let manifest = apkFiles.get('AndroidManifest.xml');
-        const stringChanges = [];
+        const changes = [];
         
-        if (modes.package !== 'keep' && info.packageStringIdx !== undefined)
-            stringChanges.push({ idx: info.packageStringIdx, val: newPkg });
-        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined)
-            stringChanges.push({ idx: info.versionNameStringIdx, val: newVN });
-        if (renamePerms && modes.package !== 'keep' && oldPkg !== newPkg)
-            stringChanges.push(...computePermissionChanges(currentParser, oldPkg, newPkg));
+        if (modes.package !== 'keep' && info.packageStringIdx !== undefined) changes.push({ idx: info.packageStringIdx, val: newPkg });
+        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined) changes.push({ idx: info.versionNameStringIdx, val: newVN });
+        if (renamePerms && modes.package !== 'keep' && oldPkg !== newPkg) changes.push(...computePermissionChanges(currentParser, oldPkg, newPkg));
         
-        if (stringChanges.length > 0) manifest = new AXMLModifier(manifest).modifyStrings(stringChanges);
+        if (changes.length) manifest = new AXMLModifier(manifest).modifyStrings(changes);
         if (modes.versionCode !== 'keep') { const m = new AXMLModifier(manifest); m.modifyIntAttr('manifest', 'versionCode', newVC); manifest = m.data; }
         
         setProgress(25, 'Building ZIP...');
         
-        const zipWriter = new ZipWriter();
-        const filesToSign = [];
-        const sortedFiles = [...apkFiles.entries()].filter(([n]) => !n.startsWith('META-INF/')).sort((a, b) => a[0].localeCompare(b[0]));
+        const zip = new ZipWriter(), toSign = [];
+        const sorted = [...apkFiles.entries()].filter(([n]) => !n.startsWith('META-INF/')).sort((a, b) => a[0].localeCompare(b[0]));
         
-        for (const [name, data] of sortedFiles) {
-            const fileData = name === 'AndroidManifest.xml' ? manifest : data;
+        for (const [name, data] of sorted) {
+            const fData = name === 'AndroidManifest.xml' ? manifest : data;
             let compress = true, alignment = 0;
             if (name.endsWith('.so') || name.startsWith('lib/')) { compress = false; alignment = 4096; }
             else if (name === 'resources.arsc') { compress = false; alignment = 4; }
             else if (name.match(/\.(png|jpg|jpeg|gif|webp|mp3|ogg|mp4|wav|flac)$/i)) { compress = false; alignment = 4; }
-            zipWriter.addFile(name, fileData, { compress, alignment });
-            filesToSign.push({ name, data: fileData });
+            zip.addFile(name, fData, { compress, alignment });
+            toSign.push({ name, data: fData });
         }
         
-        log(`Added ${filesToSign.length} files`, 'info');
+        log(`Files: ${toSign.length}`, 'info');
         
-        setProgress(45, 'Generating signing key...');
+        setProgress(40, 'Generating signing key...');
         
         const signer = new APKSigner();
+        let signingSeed;
         
-        if (modes.signing === 'jks') {
-            const jksFile = $('jksFile').files[0];
-            if (!jksFile) throw new Error('Please select a keystore file');
-            const jksBuffer = await jksFile.arrayBuffer();
-            await signer.loadFromKeystore(jksBuffer, $('storePassword').value, $('keyAlias').value, $('keyPassword').value);
+        if (modes.signing === 'custom') {
+            signingSeed = $('customSigningSeed').value;
+            if (!signingSeed) throw new Error('Enter custom signing seed');
+        } else if (modes.signing === 'jks') {
+            throw new Error('JKS upload not fully implemented - use derived or custom seed');
         } else {
-            let signingSeed;
-            if (modes.signing === 'custom') {
-                signingSeed = $('customSigningSeed').value;
-                if (!signingSeed) throw new Error('Please enter a custom signing seed');
-            } else {
-                signingSeed = deriveSigningSeed($('masterSigningKey').value, newPkg);
-            }
-            log(`Using signing seed: ${signingSeed.slice(0, 16)}...`, 'info');
-            await signer.generateFromSeed(signingSeed, newPkg);
+            signingSeed = deriveSigningSeed($('masterSigningKey').value, newPkg);
         }
         
-        setProgress(60, 'Creating V1 signature...');
-        const v1 = await signer.signV1(filesToSign);
-        zipWriter.addFile('META-INF/MANIFEST.MF', v1.mf, { compress: false });
-        zipWriter.addFile('META-INF/CERT.SF', v1.sf, { compress: false });
-        zipWriter.addFile('META-INF/CERT.RSA', v1.rsa, { compress: false });
+        await signer.generateFromSeed(signingSeed, newPkg);
+        
+        setProgress(60, 'V1 signature...');
+        const v1 = await signer.signV1(toSign);
+        zip.addFile('META-INF/MANIFEST.MF', v1.mf, { compress: false, alignment: 0 });
+        zip.addFile('META-INF/CERT.SF', v1.sf, { compress: false, alignment: 0 });
+        zip.addFile('META-INF/CERT.RSA', v1.rsa, { compress: false, alignment: 0 });
         
         setProgress(75, 'Building APK...');
-        let apkData = await zipWriter.build();
-        log(`Pre-V2 APK: ${apkData.length} bytes`, 'info');
+        let apk = await zip.build();
+        log(`Pre-V2: ${apk.length} bytes`, 'info');
         
-        setProgress(85, 'Creating V2 signature...');
-        apkData = await signer.signV2(apkData);
+        setProgress(85, 'V2 signature...');
+        apk = await signer.signV2(apk);
         
         setProgress(95, 'Downloading...');
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([apkData], { type: 'application/vnd.android.package-archive' }));
+        a.href = URL.createObjectURL(new Blob([apk], { type: 'application/vnd.android.package-archive' }));
         a.download = `${newPkg.split('.').pop()}_v${newVC}.apk`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         
-        setProgress(100, 'Complete!');
-        log(`Done! Final size: ${(apkData.length / 1024 / 1024).toFixed(2)} MB`, 'success');
+        setProgress(100, 'Done!');
+        log(`Complete: ${(apk.length / 1048576).toFixed(2)} MB`, 'success');
     } catch (e) {
         log(`Error: ${e.message}`, 'error');
         console.error(e);
@@ -1524,6 +1353,9 @@ $('repackBtn').addEventListener('click', async () => {
         $('repackBtn').disabled = false;
     }
 });
+
+// Initialize
+applyUrlParams();
 </script>
 </body>
 </html>
