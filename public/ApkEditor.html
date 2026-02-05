@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APK Editor - Pure Frontend</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh; color: #e0e0e0; padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 10px; color: #4fc3f7; }
+        .credit { text-align: center; font-size: 12px; color: #888; margin-bottom: 20px; }
+        .card {
+            background: rgba(255,255,255,0.05); border-radius: 16px;
+            padding: 24px; margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card h2 { color: #81d4fa; margin-bottom: 16px; font-size: 18px; }
+        .upload-zone {
+            border: 2px dashed #4fc3f7; border-radius: 12px;
+            padding: 40px; text-align: center; cursor: pointer;
+        }
+        .upload-zone:hover, .upload-zone.dragover { background: rgba(79,195,247,0.1); }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; color: #b0bec5; font-size: 14px; }
+        .form-group input[type="text"], .form-group input[type="number"] {
+            width: 100%; padding: 12px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.3); color: #fff; font-size: 14px;
+        }
+        .form-group input:focus { outline: none; border-color: #4fc3f7; }
+        .row { display: flex; gap: 16px; }
+        .row .form-group { flex: 1; }
+        .btn {
+            padding: 14px 28px; border: none; border-radius: 8px;
+            font-size: 16px; cursor: pointer; font-weight: 600;
+        }
+        .btn-primary { background: linear-gradient(135deg, #4fc3f7, #29b6f6); color: #000; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-small {
+            padding: 6px 12px; font-size: 12px;
+            background: rgba(79,195,247,0.2); color: #4fc3f7;
+            border: 1px solid #4fc3f7; border-radius: 6px; cursor: pointer;
+        }
+        .info-box {
+            background: rgba(0,0,0,0.3); border-radius: 8px;
+            padding: 16px; font-family: monospace; font-size: 13px;
+        }
+        .info-row { display: flex; margin-bottom: 8px; }
+        .info-label { color: #4fc3f7; width: 120px; }
+        .info-value { color: #a5d6a7; word-break: break-all; }
+        .progress-container { display: none; margin-top: 16px; }
+        .progress-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #4fc3f7, #29b6f6); width: 0%; transition: width 0.3s; }
+        .progress-text { text-align: center; margin-top: 8px; font-size: 14px; }
+        .option-group { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .option-btn {
+            padding: 6px 12px; border-radius: 6px; font-size: 12px;
+            border: 1px solid rgba(255,255,255,0.2); background: transparent;
+            color: #b0bec5; cursor: pointer;
+        }
+        .option-btn.active { background: #4fc3f7; color: #000; border-color: #4fc3f7; }
+        .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .log { max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; }
+        .log-entry { padding: 2px 0; }
+        .log-entry.error { color: #ef5350; }
+        .log-entry.success { color: #66bb6a; }
+        .log-entry.info { color: #42a5f5; }
+        .log-entry.warn { color: #ffa726; }
+        .toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #4caf50; color: white; padding: 12px 24px;
+            border-radius: 8px; display: none; z-index: 1000;
+        }
+        .toast.show { display: block; }
+        
+        /* 修复的开关样式 */
+        .switch-row {
+            display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+            padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;
+        }
+        .switch-row .switch-label { flex: 1; color: #b0bec5; font-size: 14px; }
+        .help-text { font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4; }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            border-radius: 28px;
+            transition: 0.3s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        input:checked + .slider {
+            background-color: #4fc3f7;
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        
+        @media (max-width: 600px) {
+            .row { flex-direction: column; gap: 0; }
+            .switch-row { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 APK Editor</h1>
+        <p class="credit">by <a href="https://github.com/maoist2009">maoist2009</a> with <a href="https://www.anthropic.com/claude/opus">claude opus 4.5 thinking</a> on <a href="https://arena.ai">Arena</a></p>
+        
+        <div class="card">
+            <h2>📁 Upload APK</h2>
+            <div class="upload-zone" id="uploadZone">
+                <p>📦 Drop APK here or click to select</p>
+            </div>
+            <input type="file" id="apkFile" accept=".apk" style="display:none">
+            <div id="apkInfo" style="display:none;margin-top:16px">
+                <div class="info-box">
+                    <div class="info-row"><span class="info-label">Package:</span><span class="info-value" id="origPackage">-</span></div>
+                    <div class="info-row"><span class="info-label">Version Code:</span><span class="info-value" id="origVersionCode">-</span></div>
+                    <div class="info-row"><span class="info-label">Version Name:</span><span class="info-value" id="origVersionName">-</span></div>
+                    <div class="info-row"><span class="info-label">App Label:</span><span class="info-value" id="origLabel">-</span></div>
+                    <div class="info-row"><span class="info-label">Min SDK:</span><span class="info-value" id="origMinSdk">-</span></div>
+                    <div class="info-row"><span class="info-label">Target SDK:</span><span class="info-value" id="origTargetSdk">-</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="editCard" style="display:none">
+            <h2>✏️ Edit Configuration</h2>
+            
+            <div class="form-group">
+                <label>Random Seed</label>
+                <input type="text" id="randomSeed" value="apk-editor-2024">
+            </div>
+
+            <div class="form-group">
+                <label>Package Name</label>
+                <div class="option-group">
+                    <button class="option-btn active" data-mode="derived" data-target="package">Derived</button>
+                    <button class="option-btn" data-mode="custom" data-target="package">Custom</button>
+                    <button class="option-btn" data-mode="keep" data-target="package">Keep</button>
+                </div>
+                <input type="text" id="newPackage">
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Version Code</label>
+                    <div class="option-group">
+                        <button class="option-btn active" data-mode="keep" data-target="versionCode">Keep</button>
+                        <button class="option-btn" data-mode="custom" data-target="versionCode">Custom</button>
+                    </div>
+                    <input type="number" id="newVersionCode">
+                </div>
+                <div class="form-group">
+                    <label>Version Name</label>
+                    <div class="option-group">
+                        <button class="option-btn active" data-mode="keep" data-target="versionName">Keep</button>
+                        <button class="option-btn" data-mode="custom" data-target="versionName">Custom</button>
+                    </div>
+                    <input type="text" id="newVersionName">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>App Name</label>
+                <div class="option-group">
+                    <button class="option-btn active" data-mode="keep" data-target="appName">Keep</button>
+                    <button class="option-btn" data-mode="derived" data-target="appName">Derived</button>
+                    <button class="option-btn" data-mode="custom" data-target="appName">Custom</button>
+                </div>
+                <input type="text" id="newAppName">
+            </div>
+
+            <div class="switch-row">
+                <div class="switch-label">
+                    🔐 Rename Custom Permissions & Authorities
+                    <div class="help-text">
+                        When package name changes:<br>
+                        • Custom permissions containing old package → replaced with new package<br>
+                        • Other custom permissions → add _aee suffix<br>
+                        • Authorities → similar logic<br>
+                        • System permissions (android.permission.*) are NOT modified
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="renamePermissions">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <button class="btn btn-primary" id="repackBtn" style="width:100%;margin-top:16px">
+                🔧 Repack APK (V1+V2 Signature)
+            </button>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText">Processing...</div>
+            </div>
+        </div>
+
+        <div class="card" id="logCard" style="display:none">
+            <div class="log-header">
+                <h2>📋 Log</h2>
+                <button class="btn btn-small" onclick="copyLog()">📋 Copy</button>
+            </div>
+            <div class="log" id="logContainer"></div>
+        </div>
+    </div>
+    <div class="toast" id="toast">Copied!</div>
+
+<script>
+// ========== Utilities ==========
+const $ = id => document.getElementById(id);
+const log = (msg, type = 'info') => {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    $('logContainer').appendChild(entry);
+    $('logContainer').scrollTop = 1e9;
+    console.log(`[${type}]`, msg);
+};
+const copyLog = () => {
+    navigator.clipboard.writeText([...$('logContainer').children].map(e => e.textContent).join('\n'));
+    $('toast').classList.add('show');
+    setTimeout(() => $('toast').classList.remove('show'), 1500);
+};
+const setProgress = (p, t) => {
+    $('progressFill').style.width = p + '%';
+    $('progressText').textContent = t;
+};
+
+class SeededRandom {
+    constructor(seed) {
+        this.s = 0;
+        for (let i = 0; i < seed.length; i++) this.s = ((this.s << 5) - this.s + seed.charCodeAt(i)) | 0;
+        this.s = Math.abs(this.s) || 1;
+    }
+    next() { this.s = (this.s * 1103515245 + 12345) & 0x7fffffff; return this.s / 0x7fffffff; }
+    int(a, b) { return Math.floor(this.next() * (b - a + 1)) + a; }
+    pick(arr) { return arr[this.int(0, arr.length - 1)]; }
+}
+
+const derivePackage = (orig, seed) => {
+    const r = new SeededRandom(seed + orig);
+    return `${r.pick(['com','org','net','io'])}.dev${r.int(1000,9999)}.${r.pick(['app','pro','lite','fast'])}${r.pick(['tool','helper','util'])}`;
+};
+const deriveName = seed => {
+    const r = new SeededRandom(seed);
+    return `${r.pick(['Super','Ultra','Pro','Fast'])} ${r.pick(['App','Tool','Helper'])}`;
+};
+
+// ========== System Permissions List ==========
+// 系统权限前缀 - 这些权限绝对不能修改
+const SYSTEM_PERMISSION_PREFIXES = [
+    'android.permission.',
+    'android.permission.BIND_',
+    'com.android.',
+    'com.google.android.',
+];
+
+function isSystemPermission(permName) {
+    for (const prefix of SYSTEM_PERMISSION_PREFIXES) {
+        if (permName.startsWith(prefix)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ========== ZIP Reader ==========
+class ZipReader {
+    constructor(buffer) {
+        this.buffer = buffer;
+        this.view = new DataView(buffer);
+        this.entries = new Map();
+        
+        let eocdPos = -1;
+        for (let i = buffer.byteLength - 22; i >= Math.max(0, buffer.byteLength - 65557); i--) {
+            if (this.view.getUint32(i, true) === 0x06054b50) { eocdPos = i; break; }
+        }
+        if (eocdPos < 0) throw new Error('Invalid ZIP');
+        
+        const cdOffset = this.view.getUint32(eocdPos + 16, true);
+        const cdCount = this.view.getUint16(eocdPos + 10, true);
+        
+        let pos = cdOffset;
+        for (let i = 0; i < cdCount; i++) {
+            if (pos + 46 > buffer.byteLength) break;
+            if (this.view.getUint32(pos, true) !== 0x02014b50) break;
+            
+            const method = this.view.getUint16(pos + 10, true);
+            const compSize = this.view.getUint32(pos + 20, true);
+            const nameLen = this.view.getUint16(pos + 28, true);
+            const extraLen = this.view.getUint16(pos + 30, true);
+            const commentLen = this.view.getUint16(pos + 32, true);
+            const localOffset = this.view.getUint32(pos + 42, true);
+            const name = new TextDecoder().decode(new Uint8Array(buffer, pos + 46, nameLen));
+            
+            this.entries.set(name, { method, compSize, localOffset });
+            pos += 46 + nameLen + extraLen + commentLen;
+        }
+    }
+    
+    async getEntry(name) {
+        const entry = this.entries.get(name);
+        if (!entry) return null;
+        
+        const localNameLen = this.view.getUint16(entry.localOffset + 26, true);
+        const localExtraLen = this.view.getUint16(entry.localOffset + 28, true);
+        const dataOffset = entry.localOffset + 30 + localNameLen + localExtraLen;
+        const compData = new Uint8Array(this.buffer, dataOffset, entry.compSize);
+        
+        if (entry.method === 0) return compData.slice();
+        if (entry.method === 8) {
+            const ds = new DecompressionStream('deflate-raw');
+            return new Uint8Array(await new Response(new Blob([compData]).stream().pipeThrough(ds)).arrayBuffer());
+        }
+        throw new Error(`Unsupported compression: ${entry.method}`);
+    }
+}
+
+// ========== ZIP Writer with alignment ==========
+class ZipWriter {
+    constructor() { this.files = []; }
+    
+    static crc32Table = (() => {
+        const table = [];
+        for (let i = 0; i < 256; i++) {
+            let c = i;
+            for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            table.push(c);
+        }
+        return table;
+    })();
+    
+    crc32(data) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < data.length; i++) crc = ZipWriter.crc32Table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+    
+    addFile(name, data, options = {}) {
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+        const { compress = true, alignment = 0 } = options;
+        
+        this.files.push({
+            name,
+            data: bytes,
+            compress: compress && alignment === 0,
+            alignment,
+            crc: this.crc32(bytes)
+        });
+    }
+    
+    async build() {
+        const chunks = [];
+        const cdEntries = [];
+        let offset = 0;
+        
+        for (const file of this.files) {
+            const nameBytes = new TextEncoder().encode(file.name);
+            let compData = file.data;
+            let method = 0;
+            
+            if (file.compress && file.data.length > 0) {
+                try {
+                    const cs = new CompressionStream('deflate-raw');
+                    const result = await new Response(new Blob([file.data]).stream().pipeThrough(cs)).arrayBuffer();
+                    if (result.byteLength < file.data.length * 0.9) {
+                        compData = new Uint8Array(result);
+                        method = 8;
+                    }
+                } catch (e) {}
+            }
+            
+            let extraSize = 0;
+            if (file.alignment > 0 && method === 0) {
+                const headerAndName = offset + 30 + nameBytes.length;
+                const misalignment = headerAndName % file.alignment;
+                if (misalignment !== 0) {
+                    extraSize = file.alignment - misalignment;
+                }
+            }
+            
+            const local = new Uint8Array(30);
+            const lv = new DataView(local.buffer);
+            lv.setUint32(0, 0x04034B50, true);
+            lv.setUint16(4, 20, true);
+            lv.setUint16(6, 0, true);
+            lv.setUint16(8, method, true);
+            lv.setUint16(10, 0x0821, true);
+            lv.setUint16(12, 0x0021, true);
+            lv.setUint32(14, file.crc, true);
+            lv.setUint32(18, compData.length, true);
+            lv.setUint32(22, file.data.length, true);
+            lv.setUint16(26, nameBytes.length, true);
+            lv.setUint16(28, extraSize, true);
+            
+            chunks.push(local);
+            chunks.push(nameBytes);
+            if (extraSize > 0) chunks.push(new Uint8Array(extraSize));
+            chunks.push(compData);
+            
+            const fileOffset = offset;
+            offset += 30 + nameBytes.length + extraSize + compData.length;
+            
+            const cd = new Uint8Array(46);
+            const cv = new DataView(cd.buffer);
+            cv.setUint32(0, 0x02014B50, true);
+            cv.setUint16(4, 0x0314, true);
+            cv.setUint16(6, 20, true);
+            cv.setUint16(8, 0, true);
+            cv.setUint16(10, method, true);
+            cv.setUint16(12, 0x0821, true);
+            cv.setUint16(14, 0x0021, true);
+            cv.setUint32(16, file.crc, true);
+            cv.setUint32(20, compData.length, true);
+            cv.setUint32(24, file.data.length, true);
+            cv.setUint16(28, nameBytes.length, true);
+            cv.setUint16(30, 0, true);
+            cv.setUint16(32, 0, true);
+            cv.setUint16(34, 0, true);
+            cv.setUint16(36, 0, true);
+            cv.setUint32(38, 0, true);
+            cv.setUint32(42, fileOffset, true);
+            
+            cdEntries.push(cd);
+            cdEntries.push(nameBytes);
+        }
+        
+        const cdOffset = offset;
+        let cdSize = 0;
+        for (const c of cdEntries) { chunks.push(c); cdSize += c.length; }
+        
+        const eocd = new Uint8Array(22);
+        const ev = new DataView(eocd.buffer);
+        ev.setUint32(0, 0x06054B50, true);
+        ev.setUint16(8, this.files.length, true);
+        ev.setUint16(10, this.files.length, true);
+        ev.setUint32(12, cdSize, true);
+        ev.setUint32(16, cdOffset, true);
+        chunks.push(eocd);
+        
+        const total = chunks.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(total);
+        let pos = 0;
+        for (const c of chunks) { result.set(c, pos); pos += c.length; }
+        return result;
+    }
+}
+
+// ========== AXML Parser ==========
+class AXMLParser {
+    constructor(data) {
+        this.data = new Uint8Array(data);
+        this.view = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength);
+        this.strings = [];
+        this.info = {};
+        this.stringPoolSize = 0;
+        this.permissions = [];
+        this.authorities = [];
+        this.parse();
+    }
+    
+    readU16(offset) { return this.view.getUint16(offset, true); }
+    readU32(offset) { return this.view.getUint32(offset, true); }
+    readI32(offset) { return this.view.getInt32(offset, true); }
+    
+    parse() {
+        const magic = this.readU32(0);
+        if (magic !== 0x00080003) throw new Error('Invalid AXML magic');
+        
+        let pos = 8;
+        while (pos + 8 <= this.data.length) {
+            const chunkType = this.readU16(pos);
+            const headerSize = this.readU16(pos + 2);
+            const chunkSize = this.readU32(pos + 4);
+            
+            if (chunkSize < 8 || pos + chunkSize > this.data.length) break;
+            
+            switch (chunkType) {
+                case 0x0001: this.parseStringPool(pos, chunkSize); break;
+                case 0x0102: this.parseStartElement(pos, headerSize); break;
+            }
+            
+            pos += chunkSize;
+        }
+    }
+    
+    parseStringPool(start, size) {
+        this.stringPoolSize = size;
+        
+        const stringCount = this.readU32(start + 8);
+        const flags = this.readU32(start + 16);
+        const stringsStart = this.readU32(start + 20);
+        const isUtf8 = (flags & 0x100) !== 0;
+        this.isUtf8 = isUtf8;
+        
+        const offsets = [];
+        for (let i = 0; i < stringCount; i++) {
+            offsets.push(this.readU32(start + 28 + i * 4));
+        }
+        
+        const stringsDataStart = start + stringsStart;
+        for (let i = 0; i < stringCount; i++) {
+            const strOffset = stringsDataStart + offsets[i];
+            let str = '';
+            
+            try {
+                if (isUtf8) {
+                    let p = strOffset;
+                    let charLen = this.data[p++];
+                    if (charLen & 0x80) charLen = ((charLen & 0x7F) << 8) | this.data[p++];
+                    let byteLen = this.data[p++];
+                    if (byteLen & 0x80) byteLen = ((byteLen & 0x7F) << 8) | this.data[p++];
+                    str = new TextDecoder('utf-8').decode(this.data.subarray(p, p + byteLen));
+                } else {
+                    let p = strOffset;
+                    let len = this.data[p] | (this.data[p + 1] << 8);
+                    p += 2;
+                    if (len & 0x8000) {
+                        len = ((len & 0x7FFF) << 16) | (this.data[p] | (this.data[p + 1] << 8));
+                        p += 2;
+                    }
+                    const chars = [];
+                    for (let j = 0; j < len; j++) {
+                        const c = this.data[p] | (this.data[p + 1] << 8);
+                        p += 2;
+                        if (c === 0) break;
+                        chars.push(String.fromCharCode(c));
+                    }
+                    str = chars.join('');
+                }
+            } catch (e) {}
+            
+            this.strings.push(str);
+        }
+        
+        log(`Parsed ${this.strings.length} strings (UTF-8: ${isUtf8})`, 'info');
+    }
+    
+    parseStartElement(start, headerSize) {
+        const nameIdx = this.readI32(start + 20);
+        const attrStart = this.readU16(start + 24);
+        const attrSize = this.readU16(start + 26);
+        const attrCount = this.readU16(start + 28);
+        
+        const elemName = (nameIdx >= 0 && nameIdx < this.strings.length) ? this.strings[nameIdx] : '';
+        const attrsOffset = start + 16 + attrStart;
+        
+        for (let i = 0; i < attrCount; i++) {
+            const attrOffset = attrsOffset + i * attrSize;
+            if (attrOffset + 20 > this.data.length) break;
+            
+            const attrNameIdx = this.readI32(attrOffset + 4);
+            const rawValue = this.readI32(attrOffset + 8);
+            const dataType = this.data[attrOffset + 15];
+            const data = this.readI32(attrOffset + 16);
+            
+            const attrName = (attrNameIdx >= 0 && attrNameIdx < this.strings.length) ? this.strings[attrNameIdx] : '';
+            
+            if (elemName === 'manifest') {
+                if (attrName === 'package' && dataType === 0x03) {
+                    this.info.package = this.strings[rawValue] || '';
+                    this.info.packageStringIdx = rawValue;
+                }
+                if (attrName === 'versionCode') this.info.versionCode = data;
+                if (attrName === 'versionName') {
+                    if (dataType === 0x03 && rawValue >= 0) {
+                        this.info.versionName = this.strings[rawValue] || '';
+                        this.info.versionNameStringIdx = rawValue;
+                    } else {
+                        this.info.versionName = String(data);
+                    }
+                }
+            } else if (elemName === 'uses-sdk') {
+                if (attrName === 'minSdkVersion') this.info.minSdk = data;
+                if (attrName === 'targetSdkVersion') this.info.targetSdk = data;
+            } else if (elemName === 'application') {
+                if (attrName === 'label') {
+                    if (dataType === 0x03 && rawValue >= 0) {
+                        this.info.label = this.strings[rawValue] || '';
+                        this.info.labelStringIdx = rawValue;
+                    } else if (dataType === 0x01) {
+                        this.info.label = `@0x${(data >>> 0).toString(16)}`;
+                    }
+                }
+            } else if (elemName === 'permission' || elemName === 'uses-permission') {
+                if (attrName === 'name' && dataType === 0x03 && rawValue >= 0) {
+                    const permName = this.strings[rawValue] || '';
+                    this.permissions.push({ 
+                        stringIdx: rawValue, 
+                        value: permName,
+                        isSystem: isSystemPermission(permName),
+                        element: elemName
+                    });
+                }
+            } else if (elemName === 'provider') {
+                if (attrName === 'authorities' && dataType === 0x03 && rawValue >= 0) {
+                    const authValue = this.strings[rawValue] || '';
+                    this.authorities.push({ stringIdx: rawValue, value: authValue });
+                }
+            }
+        }
+    }
+}
+
+// ========== AXML Modifier ==========
+class AXMLModifier {
+    constructor(data) {
+        this.data = new Uint8Array(data);
+        this.view = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength);
+    }
+    
+    readU16(off) { return this.view.getUint16(off, true); }
+    readU32(off) { return this.view.getUint32(off, true); }
+    
+    modifyStrings(changes) {
+        const spSize = this.readU32(12);
+        const stringCount = this.readU32(16);
+        const flags = this.readU32(24);
+        const stringsStart = this.readU32(28);
+        const isUtf8 = (flags & 0x100) !== 0;
+        
+        const strings = [];
+        const strDataStart = 8 + stringsStart;
+        
+        for (let i = 0; i < stringCount; i++) {
+            const offset = this.readU32(36 + i * 4);
+            const strPos = strDataStart + offset;
+            let str = '';
+            
+            try {
+                if (isUtf8) {
+                    let p = strPos;
+                    let cLen = this.data[p++];
+                    if (cLen & 0x80) p++;
+                    let bLen = this.data[p++];
+                    if (bLen & 0x80) bLen = ((bLen & 0x7F) << 8) | this.data[p++];
+                    str = new TextDecoder('utf-8').decode(this.data.subarray(p, p + bLen));
+                } else {
+                    let p = strPos;
+                    let len = this.data[p] | (this.data[p + 1] << 8);
+                    p += 2;
+                    const chars = [];
+                    for (let j = 0; j < len; j++) {
+                        chars.push(String.fromCharCode(this.data[p] | (this.data[p + 1] << 8)));
+                        p += 2;
+                    }
+                    str = chars.join('');
+                }
+            } catch (e) {}
+            strings.push(str);
+        }
+        
+        const changeMap = new Map();
+        for (const c of changes) {
+            if (c.idx !== undefined && c.idx >= 0 && c.idx < strings.length) {
+                changeMap.set(c.idx, c.val);
+            }
+        }
+        
+        for (const [idx, val] of changeMap) {
+            if (strings[idx] !== val) {
+                log(`String[${idx}]: "${strings[idx].slice(0, 40)}" → "${val.slice(0, 40)}"`, 'info');
+                strings[idx] = val;
+            }
+        }
+        
+        return this.rebuildWithStrings(strings, isUtf8, 8 + spSize);
+    }
+    
+    rebuildWithStrings(strings, isUtf8, afterStringPool) {
+        const restData = this.data.subarray(afterStringPool);
+        
+        const stringBytes = [];
+        const offsets = [];
+        let currentOffset = 0;
+        
+        for (const str of strings) {
+            offsets.push(currentOffset);
+            
+            if (isUtf8) {
+                const encoded = new TextEncoder().encode(str);
+                const entry = [];
+                if (str.length > 0x7F) entry.push(((str.length >> 8) & 0x7F) | 0x80, str.length & 0xFF);
+                else entry.push(str.length);
+                if (encoded.length > 0x7F) entry.push(((encoded.length >> 8) & 0x7F) | 0x80, encoded.length & 0xFF);
+                else entry.push(encoded.length);
+                entry.push(...encoded, 0);
+                stringBytes.push(new Uint8Array(entry));
+                currentOffset += entry.length;
+            } else {
+                const entry = [str.length & 0xFF, (str.length >> 8) & 0x7F];
+                for (const char of str) {
+                    const code = char.charCodeAt(0);
+                    entry.push(code & 0xFF, (code >> 8) & 0xFF);
+                }
+                entry.push(0, 0);
+                stringBytes.push(new Uint8Array(entry));
+                currentOffset += entry.length;
+            }
+        }
+        
+        const headerSize = 28;
+        const offsetsSize = strings.length * 4;
+        const stringsSize = stringBytes.reduce((a, b) => a + b.length, 0);
+        const padding = (4 - (stringsSize % 4)) % 4;
+        const newSpSize = headerSize + offsetsSize + stringsSize + padding;
+        
+        const newSp = new Uint8Array(newSpSize);
+        const spView = new DataView(newSp.buffer);
+        spView.setUint16(0, 0x0001, true);
+        spView.setUint16(2, 28, true);
+        spView.setUint32(4, newSpSize, true);
+        spView.setUint32(8, strings.length, true);
+        spView.setUint32(12, 0, true);
+        spView.setUint32(16, isUtf8 ? 0x100 : 0, true);
+        spView.setUint32(20, headerSize + offsetsSize, true);
+        spView.setUint32(24, 0, true);
+        
+        for (let i = 0; i < offsets.length; i++) {
+            spView.setUint32(28 + i * 4, offsets[i], true);
+        }
+        
+        let writePos = headerSize + offsetsSize;
+        for (const bytes of stringBytes) {
+            newSp.set(bytes, writePos);
+            writePos += bytes.length;
+        }
+        
+        const newFileSize = 8 + newSpSize + restData.length;
+        const result = new Uint8Array(newFileSize);
+        const rv = new DataView(result.buffer);
+        rv.setUint32(0, 0x00080003, true);
+        rv.setUint32(4, newFileSize, true);
+        result.set(newSp, 8);
+        result.set(restData, 8 + newSpSize);
+        
+        return result;
+    }
+    
+    modifyIntAttr(elemName, attrName, newValue) {
+        const parser = new AXMLParser(this.data);
+        const strings = parser.strings;
+        
+        let pos = 8 + parser.stringPoolSize;
+        if (pos + 8 <= this.data.length && this.readU16(pos) === 0x0180) {
+            pos += this.readU32(pos + 4);
+        }
+        
+        while (pos + 8 <= this.data.length) {
+            const chunkType = this.readU16(pos);
+            const headerSize = this.readU16(pos + 2);
+            const chunkSize = this.readU32(pos + 4);
+            
+            if (chunkSize < 8 || pos + chunkSize > this.data.length) break;
+            
+            if (chunkType === 0x0102) {
+                const nameIdx = this.view.getInt32(pos + 20, true);
+                const attrStart = this.readU16(pos + 24);
+                const attrSize = this.readU16(pos + 26);
+                const attrCount = this.readU16(pos + 28);
+                
+                if (strings[nameIdx] === elemName) {
+                    const attrsOffset = pos + 16 + attrStart;
+                    for (let i = 0; i < attrCount; i++) {
+                        const attrOffset = attrsOffset + i * attrSize;
+                        const attrNameIdx = this.view.getInt32(attrOffset + 4, true);
+                        if (strings[attrNameIdx] === attrName) {
+                            this.view.setInt32(attrOffset + 16, newValue, true);
+                            log(`Modified ${elemName}/@${attrName} = ${newValue}`, 'info');
+                            return;
+                        }
+                    }
+                }
+            }
+            pos += chunkSize;
+        }
+    }
+}
+
+// ========== APK Signer ==========
+class APKSigner {
+    constructor() {
+        this.privateKey = null;
+        this.publicKeyDer = null;
+        this.certificate = null;
+    }
+    
+    concat(...arrays) {
+        const filtered = arrays.filter(a => a && a.length);
+        const result = new Uint8Array(filtered.reduce((s, a) => s + a.length, 0));
+        let offset = 0;
+        for (const arr of filtered) { result.set(arr, offset); offset += arr.length; }
+        return result;
+    }
+    
+    derLen(len) {
+        if (len < 128) return new Uint8Array([len]);
+        if (len < 256) return new Uint8Array([0x81, len]);
+        return new Uint8Array([0x82, (len >> 8) & 0xFF, len & 0xFF]);
+    }
+    derSeq(...items) { const c = this.concat(...items); return this.concat(new Uint8Array([0x30]), this.derLen(c.length), c); }
+    derSet(...items) { const c = this.concat(...items); return this.concat(new Uint8Array([0x31]), this.derLen(c.length), c); }
+    derInt(bytes) {
+        let a = bytes instanceof Uint8Array ? bytes : new Uint8Array([bytes]);
+        while (a.length > 1 && a[0] === 0 && !(a[1] & 0x80)) a = a.slice(1);
+        if (a[0] & 0x80) a = this.concat(new Uint8Array([0]), a);
+        return this.concat(new Uint8Array([0x02]), this.derLen(a.length), a);
+    }
+    derBits(b) { return this.concat(new Uint8Array([0x03]), this.derLen(b.length + 1), new Uint8Array([0]), b); }
+    derOcts(b) { return this.concat(new Uint8Array([0x04]), this.derLen(b.length), b); }
+    derOid(oid) {
+        const p = oid.split('.').map(Number);
+        const b = [p[0] * 40 + p[1]];
+        for (let i = 2; i < p.length; i++) {
+            let v = p[i];
+            if (v === 0) { b.push(0); continue; }
+            const o = [];
+            while (v > 0) { o.unshift(v & 0x7F); v >>>= 7; }
+            for (let j = 0; j < o.length - 1; j++) o[j] |= 0x80;
+            b.push(...o);
+        }
+        return this.concat(new Uint8Array([0x06, b.length]), new Uint8Array(b));
+    }
+    derUtf8(s) { const b = new TextEncoder().encode(s); return this.concat(new Uint8Array([0x0C]), this.derLen(b.length), b); }
+    derUtc(d) {
+        const pad = n => n.toString().padStart(2, '0');
+        const s = `${pad(d.getUTCFullYear() % 100)}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+        return this.concat(new Uint8Array([0x17, s.length]), new TextEncoder().encode(s));
+    }
+    
+    async generateKey(cn) {
+        log('Generating RSA-2048 key pair...', 'info');
+        
+        const keyPair = await crypto.subtle.generateKey(
+            { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+            true, ['sign', 'verify']
+        );
+        
+        this.privateKey = keyPair.privateKey;
+        this.publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', keyPair.publicKey));
+        
+        const now = new Date();
+        const notAfter = new Date(now.getTime() + 25 * 365 * 24 * 60 * 60 * 1000);
+        const serial = crypto.getRandomValues(new Uint8Array(16));
+        serial[0] &= 0x7F;
+        
+        const sha256Rsa = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
+        const issuer = this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8(cn))));
+        const validity = this.derSeq(this.derUtc(now), this.derUtc(notAfter));
+        
+        const extensions = this.derSeq(
+            this.derSeq(this.derOid('2.5.29.19'), new Uint8Array([0x01, 0x01, 0xFF]), this.derOcts(this.derSeq())),
+            this.derSeq(this.derOid('2.5.29.15'), new Uint8Array([0x01, 0x01, 0xFF]), this.derOcts(new Uint8Array([0x03, 0x02, 0x07, 0x80])))
+        );
+        const extensionsCtx = this.concat(new Uint8Array([0xA3]), this.derLen(extensions.length), extensions);
+        
+        const tbs = this.derSeq(
+            new Uint8Array([0xA0, 0x03, 0x02, 0x01, 0x02]),
+            this.derInt(serial),
+            sha256Rsa, issuer, validity, issuer,
+            this.publicKeyDer,
+            extensionsCtx
+        );
+        
+        const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', keyPair.privateKey, tbs));
+        this.certificate = this.derSeq(tbs, sha256Rsa, this.derBits(signature));
+        
+        log(`Certificate generated: ${this.certificate.length} bytes`, 'success');
+    }
+    
+    async signV1(files) {
+        log('Creating V1 (JAR) signature...', 'info');
+        
+        const mfLines = ['Manifest-Version: 1.0', 'Created-By: APK Editor', ''];
+        for (const f of files) {
+            if (f.name.startsWith('META-INF/')) continue;
+            const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', f.data));
+            mfLines.push(`Name: ${f.name}`, `SHA-256-Digest: ${btoa(String.fromCharCode(...digest))}`, '');
+        }
+        const mf = new TextEncoder().encode(mfLines.join('\r\n'));
+        
+        const mfDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', mf));
+        const sfLines = ['Signature-Version: 1.0', `SHA-256-Digest-Manifest: ${btoa(String.fromCharCode(...mfDigest))}`, 'Created-By: APK Editor', ''];
+        const sf = new TextEncoder().encode(sfLines.join('\r\n'));
+        
+        const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, sf));
+        
+        const digestAlg = this.derSeq(this.derOid('2.16.840.1.101.3.4.2.1'), new Uint8Array([0x05, 0x00]));
+        const sigAlg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
+        const issuerAndSerial = this.derSeq(
+            this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8('CN')))),
+            this.derInt(new Uint8Array([1]))
+        );
+        const signerInfo = this.derSeq(this.derInt(new Uint8Array([1])), issuerAndSerial, digestAlg, sigAlg, this.derOcts(sig));
+        const signedData = this.derSeq(
+            this.derInt(new Uint8Array([1])), this.derSet(digestAlg),
+            this.derSeq(this.derOid('1.2.840.113549.1.7.1')),
+            this.concat(new Uint8Array([0xA0]), this.derLen(this.certificate.length), this.certificate),
+            this.derSet(signerInfo)
+        );
+        const pkcs7 = this.derSeq(
+            this.derOid('1.2.840.113549.1.7.2'),
+            this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData)
+        );
+        
+        log(`V1: MF=${mf.length}, SF=${sf.length}, RSA=${pkcs7.length}`, 'info');
+        return { mf, sf, rsa: pkcs7 };
+    }
+    
+    async signV2(apkBytes) {
+        log('Creating V2 (APK Signature Scheme v2) signature...', 'info');
+        
+        const apk = apkBytes instanceof Uint8Array ? apkBytes : new Uint8Array(apkBytes);
+        const view = new DataView(apk.buffer, apk.byteOffset, apk.byteLength);
+        
+        let eocdOffset = -1;
+        for (let i = apk.length - 22; i >= Math.max(0, apk.length - 65557); i--) {
+            if (view.getUint32(i, true) === 0x06054B50) { eocdOffset = i; break; }
+        }
+        if (eocdOffset < 0) throw new Error('EOCD not found');
+        
+        const cdOffset = view.getUint32(eocdOffset + 16, true);
+        const section1 = apk.slice(0, cdOffset);
+        const section3 = apk.slice(cdOffset, eocdOffset);
+        const section4 = apk.slice(eocdOffset);
+        
+        log(`Sections: entries=${section1.length}, CD=${section3.length}, EOCD=${section4.length}`, 'info');
+        
+        const CHUNK_SIZE = 1024 * 1024;
+        const chunkDigests = [];
+        
+        const processChunks = async (data) => {
+            for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+                const chunk = data.slice(i, Math.min(i + CHUNK_SIZE, data.length));
+                const prefixed = new Uint8Array(5 + chunk.length);
+                prefixed[0] = 0xA5;
+                new DataView(prefixed.buffer).setUint32(1, chunk.length, true);
+                prefixed.set(chunk, 5);
+                chunkDigests.push(new Uint8Array(await crypto.subtle.digest('SHA-256', prefixed)));
+            }
+        };
+        
+        await processChunks(section1);
+        await processChunks(section3);
+        await processChunks(section4);
+        
+        const allDigests = new Uint8Array(chunkDigests.length * 32);
+        chunkDigests.forEach((d, i) => allDigests.set(d, i * 32));
+        
+        const topPrefix = new Uint8Array(5 + allDigests.length);
+        topPrefix[0] = 0x5A;
+        new DataView(topPrefix.buffer).setUint32(1, chunkDigests.length, true);
+        topPrefix.set(allDigests, 5);
+        const contentDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', topPrefix));
+        
+        log(`Content digest: ${chunkDigests.length} chunks`, 'info');
+        
+        const lp = (data) => {
+            const result = new Uint8Array(4 + data.length);
+            new DataView(result.buffer).setUint32(0, data.length, true);
+            result.set(data, 4);
+            return result;
+        };
+        
+        const u32 = (val) => {
+            const result = new Uint8Array(4);
+            new DataView(result.buffer).setUint32(0, val, true);
+            return result;
+        };
+        
+        const SIGNATURE_ALGORITHM_ID = 0x0103;
+        
+        const digestEntry = this.concat(u32(SIGNATURE_ALGORITHM_ID), lp(contentDigest));
+        const digests = lp(lp(digestEntry));
+        const certificates = lp(lp(this.certificate));
+        const additionalAttrs = lp(new Uint8Array(0));
+        const signedDataContent = this.concat(digests, certificates, additionalAttrs);
+        
+        const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, signedDataContent));
+        log(`Signature: ${signature.length} bytes`, 'info');
+        
+        const signatureEntry = this.concat(u32(SIGNATURE_ALGORITHM_ID), lp(signature));
+        const signatures = lp(lp(signatureEntry));
+        
+        const signer = this.concat(lp(signedDataContent), signatures, lp(this.publicKeyDer));
+        const signersValue = lp(lp(signer));
+        
+        const V2_BLOCK_ID = 0x7109871A;
+        const pairPayloadSize = 4 + signersValue.length;
+        const pair = new Uint8Array(8 + 4 + signersValue.length);
+        const pairView = new DataView(pair.buffer);
+        pairView.setBigUint64(0, BigInt(pairPayloadSize), true);
+        pairView.setUint32(8, V2_BLOCK_ID, true);
+        pair.set(signersValue, 12);
+        
+        const magic = new TextEncoder().encode('APK Sig Block 42');
+        const blockSizeValue = pair.length + 8 + magic.length;
+        
+        const signingBlock = new Uint8Array(8 + pair.length + 8 + 16);
+        const blockView = new DataView(signingBlock.buffer);
+        blockView.setBigUint64(0, BigInt(blockSizeValue), true);
+        signingBlock.set(pair, 8);
+        blockView.setBigUint64(8 + pair.length, BigInt(blockSizeValue), true);
+        signingBlock.set(magic, 8 + pair.length + 8);
+        
+        log(`Signing block: ${signingBlock.length} bytes`, 'info');
+        
+        const newCdOffset = section1.length + signingBlock.length;
+        const newApk = new Uint8Array(section1.length + signingBlock.length + section3.length + section4.length);
+        
+        newApk.set(section1, 0);
+        newApk.set(signingBlock, section1.length);
+        newApk.set(section3, section1.length + signingBlock.length);
+        newApk.set(section4, section1.length + signingBlock.length + section3.length);
+        
+        const newEocdOffset = section1.length + signingBlock.length + section3.length;
+        new DataView(newApk.buffer).setUint32(newEocdOffset + 16, newCdOffset, true);
+        
+        log(`V2 signed APK: ${newApk.length} bytes`, 'success');
+        return newApk;
+    }
+}
+
+// ========== Permission & Authority Renaming (Fixed) ==========
+function computePermissionChanges(parser, oldPackage, newPackage) {
+    const changes = [];
+    const suffix = '_aee';
+    const prefix = 'aee_';
+    
+    log(`Processing permissions: ${parser.permissions.length} found`, 'info');
+    
+    for (const perm of parser.permissions) {
+        const val = perm.value;
+        
+        // 跳过系统权限 - 绝对不能修改！
+        if (perm.isSystem) {
+            log(`⏭️ Skip system permission: ${val}`, 'info');
+            continue;
+        }
+        
+        // 自定义权限处理
+        if (val.includes(oldPackage)) {
+            // 包含原包名：替换为新包名
+            const newVal = val.replace(new RegExp(oldPackage.replace(/\./g, '\\.'), 'g'), newPackage);
+            changes.push({ idx: perm.stringIdx, val: newVal });
+            log(`🔄 Permission: ${val} → ${newVal}`, 'info');
+        } else if (val.includes('_PERMISSION') || val.includes('.permission.')) {
+            // 自定义权限但不包含原包名：添加后缀避免冲突
+            const newVal = val + suffix;
+            changes.push({ idx: perm.stringIdx, val: newVal });
+            log(`➕ Permission: ${val} → ${newVal}`, 'info');
+        }
+        // 其他权限保持不变
+    }
+    
+    log(`Processing authorities: ${parser.authorities.length} found`, 'info');
+    
+    for (const auth of parser.authorities) {
+        const val = auth.value;
+        
+        if (val.includes(oldPackage)) {
+            // 包含原包名：替换为新包名
+            const newVal = val.replace(new RegExp(oldPackage.replace(/\./g, '\\.'), 'g'), newPackage);
+            changes.push({ idx: auth.stringIdx, val: newVal });
+            log(`🔄 Authority: ${val} → ${newVal}`, 'info');
+        } else {
+            // 不包含原包名：添加前缀
+            const newVal = prefix + val;
+            changes.push({ idx: auth.stringIdx, val: newVal });
+            log(`➕ Authority: ${val} → ${newVal}`, 'info');
+        }
+    }
+    
+    return changes;
+}
+
+// ========== Main Application ==========
+let currentApk = null;
+let currentParser = null;
+let apkFiles = null;
+
+const modes = { package: 'derived', versionCode: 'keep', versionName: 'keep', appName: 'keep' };
+
+document.querySelectorAll('.option-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        this.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        modes[this.dataset.target] = this.dataset.mode;
+        updateFields();
+    });
+});
+
+$('randomSeed').addEventListener('input', updateFields);
+
+function updateFields() {
+    if (!currentParser) return;
+    const seed = $('randomSeed').value;
+    const info = currentParser.info;
+    
+    if (modes.package === 'derived') $('newPackage').value = derivePackage(info.package || '', seed);
+    else if (modes.package === 'keep') $('newPackage').value = info.package || '';
+    
+    if (modes.versionCode === 'keep') $('newVersionCode').value = info.versionCode || 1;
+    if (modes.versionName === 'keep') $('newVersionName').value = info.versionName || '1.0';
+    
+    if (modes.appName === 'derived') $('newAppName').value = deriveName(seed);
+    else if (modes.appName === 'keep') $('newAppName').value = info.label || '';
+}
+
+const uploadZone = $('uploadZone');
+const fileInput = $('apkFile');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+async function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith('.apk')) {
+        alert('Please select an APK file');
+        return;
+    }
+    
+    $('logContainer').innerHTML = '';
+    $('logCard').style.display = 'block';
+    log(`Loading: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+    
+    try {
+        currentApk = await file.arrayBuffer();
+        const zip = new ZipReader(currentApk);
+        log(`ZIP entries: ${zip.entries.size}`, 'info');
+        
+        const manifestData = await zip.getEntry('AndroidManifest.xml');
+        if (!manifestData) throw new Error('AndroidManifest.xml not found');
+        
+        currentParser = new AXMLParser(manifestData);
+        
+        apkFiles = new Map();
+        for (const [name] of zip.entries) {
+            try {
+                const data = await zip.getEntry(name);
+                if (data) apkFiles.set(name, data);
+            } catch (e) {
+                log(`Warning: Could not read ${name}`, 'warn');
+            }
+        }
+        
+        const info = currentParser.info;
+        $('origPackage').textContent = info.package || 'Unknown';
+        $('origVersionCode').textContent = info.versionCode !== undefined ? info.versionCode : 'Unknown';
+        $('origVersionName').textContent = info.versionName || 'Unknown';
+        $('origLabel').textContent = info.label || 'Unknown';
+        $('origMinSdk').textContent = info.minSdk !== undefined ? info.minSdk : 'Unknown';
+        $('origTargetSdk').textContent = info.targetSdk !== undefined ? info.targetSdk : 'Unknown';
+        
+        log(`Package: ${info.package}`, 'success');
+        log(`Version: ${info.versionCode} (${info.versionName})`, 'success');
+        log(`SDK: min=${info.minSdk}, target=${info.targetSdk}`, 'success');
+        
+        // 统计权限
+        const systemPerms = currentParser.permissions.filter(p => p.isSystem).length;
+        const customPerms = currentParser.permissions.filter(p => !p.isSystem).length;
+        log(`Permissions: ${systemPerms} system, ${customPerms} custom`, 'info');
+        log(`Authorities: ${currentParser.authorities.length}`, 'info');
+        
+        $('apkInfo').style.display = 'block';
+        $('editCard').style.display = 'block';
+        updateFields();
+        
+    } catch (e) {
+        log(`Error: ${e.message}`, 'error');
+        console.error(e);
+    }
+}
+
+$('repackBtn').addEventListener('click', async () => {
+    if (!currentApk || !currentParser) {
+        alert('Please load an APK first');
+        return;
+    }
+    
+    $('repackBtn').disabled = true;
+    $('progressContainer').style.display = 'block';
+    
+    try {
+        setProgress(5, 'Preparing...');
+        
+        const info = currentParser.info;
+        const oldPackage = info.package || '';
+        const newPackage = $('newPackage').value || oldPackage;
+        const newVersionCode = parseInt($('newVersionCode').value) || info.versionCode || 1;
+        const newVersionName = $('newVersionName').value || info.versionName || '1.0';
+        const renamePerms = $('renamePermissions').checked;
+        
+        log(`New package: ${newPackage}`, 'info');
+        log(`New version: ${newVersionCode} (${newVersionName})`, 'info');
+        log(`Rename custom permissions: ${renamePerms}`, 'info');
+        
+        setProgress(10, 'Modifying manifest...');
+        
+        let manifest = apkFiles.get('AndroidManifest.xml');
+        
+        const stringChanges = [];
+        
+        if (modes.package !== 'keep' && info.packageStringIdx !== undefined) {
+            stringChanges.push({ idx: info.packageStringIdx, val: newPackage });
+        }
+        
+        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined) {
+            stringChanges.push({ idx: info.versionNameStringIdx, val: newVersionName });
+        }
+        
+        // 权限和authorities修改（仅当启用且包名变更时）
+        if (renamePerms && modes.package !== 'keep' && oldPackage !== newPackage) {
+            const permChanges = computePermissionChanges(currentParser, oldPackage, newPackage);
+            stringChanges.push(...permChanges);
+        }
+        
+        if (stringChanges.length > 0) {
+            const modifier = new AXMLModifier(manifest);
+            manifest = modifier.modifyStrings(stringChanges);
+        }
+        
+        if (modes.versionCode !== 'keep') {
+            const modifier = new AXMLModifier(manifest);
+            modifier.modifyIntAttr('manifest', 'versionCode', newVersionCode);
+            manifest = modifier.data;
+        }
+        
+        setProgress(25, 'Building ZIP with alignment...');
+        
+        const zipWriter = new ZipWriter();
+        const filesToSign = [];
+        let count = 0;
+        
+        const sortedFiles = [...apkFiles.entries()]
+            .filter(([name]) => !name.startsWith('META-INF/'))
+            .sort((a, b) => a[0].localeCompare(b[0]));
+        
+        for (const [name, data] of sortedFiles) {
+            const fileData = (name === 'AndroidManifest.xml') ? manifest : data;
+            
+            let compress = true;
+            let alignment = 0;
+            
+            if (name.endsWith('.so') || name.startsWith('lib/')) {
+                compress = false;
+                alignment = 4096;
+            } else if (name === 'resources.arsc') {
+                compress = false;
+                alignment = 4;
+            } else if (name.match(/\.(png|jpg|jpeg|gif|webp|mp3|ogg|mp4|m4a|aac|wav|flac|zip|jar)$/i)) {
+                compress = false;
+                alignment = 4;
+            }
+            
+            zipWriter.addFile(name, fileData, { compress, alignment });
+            filesToSign.push({ name, data: fileData });
+            
+            if (++count % 100 === 0) {
+                setProgress(25 + (count / sortedFiles.length) * 20, `Files: ${count}/${sortedFiles.length}`);
+            }
+        }
+        
+        log(`Added ${filesToSign.length} files with proper alignment`, 'info');
+        
+        setProgress(50, 'Generating certificate...');
+        
+        const signer = new APKSigner();
+        await signer.generateKey(newPackage);
+        
+        setProgress(60, 'Creating V1 signature...');
+        
+        const v1 = await signer.signV1(filesToSign);
+        zipWriter.addFile('META-INF/MANIFEST.MF', v1.mf, { compress: false, alignment: 0 });
+        zipWriter.addFile('META-INF/CERT.SF', v1.sf, { compress: false, alignment: 0 });
+        zipWriter.addFile('META-INF/CERT.RSA', v1.rsa, { compress: false, alignment: 0 });
+        
+        setProgress(75, 'Building APK...');
+        
+        let apkData = await zipWriter.build();
+        log(`Pre-V2 APK: ${apkData.length} bytes`, 'info');
+        
+        setProgress(85, 'Creating V2 signature...');
+        
+        apkData = await signer.signV2(apkData);
+        
+        setProgress(95, 'Downloading...');
+        
+        const blob = new Blob([apkData], { type: 'application/vnd.android.package-archive' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${newPackage.split('.').pop()}_v${newVersionCode}.apk`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setProgress(100, 'Complete!');
+        log(`Done! Final size: ${(apkData.length / 1024 / 1024).toFixed(2)} MB`, 'success');
+        
+    } catch (e) {
+        log(`Error: ${e.message}`, 'error');
+        console.error(e);
+        setProgress(0, 'Failed');
+    } finally {
+        $('repackBtn').disabled = false;
+    }
+});
+</script>
+</body>
+</html>
