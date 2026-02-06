@@ -196,7 +196,7 @@
             <div class="switch-row">
                 <div class="switch-label">
                     🔐 Rename Custom Permissions & Authorities
-                    <div class="help-text">Only app-specific permissions are modified. System and vendor permissions (Samsung, Huawei, OPPO, etc.) are preserved.</div>
+                    <div class="help-text">Follows AEE logic: replaces package in permissions/authorities, adds prefix for others. System/vendor permissions preserved.</div>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="renamePermissions">
@@ -212,7 +212,6 @@
                     <div class="option-group">
                         <button class="option-btn active" data-mode="derived" data-target="signing">Derived from Master Key</button>
                         <button class="option-btn" data-mode="custom" data-target="signing">Custom Signing Seed</button>
-                        <button class="option-btn" data-mode="jks" data-target="signing">Upload JKS/P12</button>
                     </div>
                 </div>
 
@@ -230,29 +229,8 @@
                 <div id="signingCustom" style="display:none">
                     <div class="form-group">
                         <label>Custom Signing Seed</label>
-                        <input type="text" id="customSigningSeed" placeholder="Enter custom signing seed for sharedUserId">
+                        <input type="text" id="customSigningSeed" placeholder="Enter custom signing seed">
                         <div class="help-text">Apps with same signing seed will have identical signatures</div>
-                    </div>
-                </div>
-
-                <div id="signingJks" style="display:none">
-                    <div class="form-group">
-                        <label>JKS/P12/KeyStore File</label>
-                        <input type="file" id="jksFile" accept=".jks,.keystore,.p12,.pfx">
-                    </div>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Store Password</label>
-                            <input type="password" id="storePassword">
-                        </div>
-                        <div class="form-group">
-                            <label>Key Alias</label>
-                            <input type="text" id="keyAlias">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Key Password (if different)</label>
-                        <input type="password" id="keyPassword">
                     </div>
                 </div>
             </div>
@@ -368,7 +346,6 @@ function setMode(target, mode) {
     if (target === 'signing') {
         $('signingDerived').style.display = mode === 'derived' ? 'block' : 'none';
         $('signingCustom').style.display = mode === 'custom' ? 'block' : 'none';
-        $('signingJks').style.display = mode === 'jks' ? 'block' : 'none';
     }
 }
 
@@ -596,7 +573,6 @@ function deriveSigningSeed(masterKey, packageName) {
 }
 
 // ========== Vendor/System Permission Detection ==========
-// These permissions should NEVER be modified - they're for system/vendor integration
 const PROTECTED_PERMISSION_PREFIXES = [
     // Android system
     'android.permission.',
@@ -869,7 +845,9 @@ class AXMLParser {
                     });
                 }
             } else if (elem === 'provider') {
-                if (an === 'authorities' && type === 0x03 && raw >= 0) this.authorities.push({ stringIdx: raw, value: this.strings[raw] || '' });
+                if (an === 'authorities' && type === 0x03 && raw >= 0) {
+                    this.authorities.push({ stringIdx: raw, value: this.strings[raw] || '' });
+                }
             }
         }
     }
@@ -984,9 +962,15 @@ class AXMLModifier {
     }
 }
 
-// ========== APK Signer ==========
+// ========== APK Signer with FIXED V1 Signature ==========
 class APKSigner {
-    constructor() { this.privateKey = null; this.publicKeyDer = null; this.certificate = null; }
+    constructor() { 
+        this.privateKey = null; 
+        this.publicKeyDer = null; 
+        this.certificate = null; 
+        this.certIssuer = null; 
+        this.certSerial = null; 
+    }
     
     concat(...a) { const f = a.filter(x => x && x.length), r = new Uint8Array(f.reduce((s,x) => s + x.length, 0)); let o = 0; for (const x of f) { r.set(x, o); o += x.length; } return r; }
     derLen(n) { if (n < 128) return new Uint8Array([n]); if (n < 256) return new Uint8Array([0x81, n]); return new Uint8Array([0x82, (n >> 8) & 0xFF, n & 0xFF]); }
@@ -1009,25 +993,24 @@ class APKSigner {
     }
     
     async createCert(cn, privKey, pubKeyDer, seed) {
-        // *** CRITICAL FIX: Use deterministic dates based on seed ***
-        // This ensures the same seed always produces the exact same certificate
+        // Deterministic dates based on seed
         const r = new SeededRandom(seed + ':cert:dates:v2');
-        
-        // Fixed base date: 2024-01-01 00:00:00 UTC
-        // Add small deterministic offset for uniqueness per seed
         const baseTime = Date.UTC(2024, 0, 1, 0, 0, 0);
-        const offsetDays = r.int(0, 30); // 0-30 days offset
+        const offsetDays = r.int(0, 30);
         const now = new Date(baseTime + offsetDays * 24 * 60 * 60 * 1000);
         const later = new Date(now.getTime() + 25 * 365 * 24 * 60 * 60 * 1000);
-        
+
         // Deterministic serial from seed
         const serialBytes = new Uint8Array(16);
         const serialRng = new SeededRandom(seed + ':serial:v2');
         for (let i = 0; i < 16; i++) serialBytes[i] = serialRng.int(0, 255);
         serialBytes[0] &= 0x7F; // Ensure positive
         
+        // Store for V1 signature - MUST match certificate exactly
+        this.certSerial = serialBytes;
+        this.certIssuer = this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8(cn))));
+
         const alg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
-        const issuer = this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8(cn))));
         const validity = this.derSeq(this.derUtc(now), this.derUtc(later));
         const ext = this.derSeq(
             this.derSeq(this.derOid('2.5.29.19'), new Uint8Array([0x01, 0x01, 0xFF]), this.derOcts(this.derSeq())),
@@ -1035,7 +1018,16 @@ class APKSigner {
         );
         const extCtx = this.concat(new Uint8Array([0xA3]), this.derLen(ext.length), ext);
         
-        const tbs = this.derSeq(new Uint8Array([0xA0, 0x03, 0x02, 0x01, 0x02]), this.derInt(serialBytes), alg, issuer, validity, issuer, pubKeyDer, extCtx);
+        const tbs = this.derSeq(
+            new Uint8Array([0xA0, 0x03, 0x02, 0x01, 0x02]),
+            this.derInt(serialBytes),
+            alg,
+            this.certIssuer,
+            validity,
+            this.certIssuer,
+            pubKeyDer,
+            extCtx
+        );
         const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privKey, tbs));
         this.certificate = this.derSeq(tbs, alg, this.derBits(sig));
         log(`Certificate: ${this.certificate.length} bytes (deterministic)`, 'success');
@@ -1043,19 +1035,99 @@ class APKSigner {
     
     async signV1(files) {
         log('Creating V1 signature...', 'info');
-        const mfLines = ['Manifest-Version: 1.0', 'Created-By: APK Editor', ''];
-        for (const f of files) { if (f.name.startsWith('META-INF/')) continue; const d = new Uint8Array(await crypto.subtle.digest('SHA-256', f.data)); mfLines.push(`Name: ${f.name}`, `SHA-256-Digest: ${btoa(String.fromCharCode(...d))}`, ''); }
+        
+        // Line wrapping function for JAR manifest (max 72 chars per line)
+        const wrapLine = (prefix, value) => {
+            const full = prefix + value;
+            const lines = [];
+            if (full.length <= 70) {
+                lines.push(full);
+            } else {
+                lines.push(full.substring(0, 70));
+                let remaining = full.substring(70);
+                while (remaining.length > 0) {
+                    lines.push(' ' + remaining.substring(0, 69));
+                    remaining = remaining.substring(69);
+                }
+            }
+            return lines.join('\r\n');
+        };
+        
+        // Build MANIFEST.MF
+        const mfLines = ['Manifest-Version: 1.0', 'Created-By: 1.0 (APK Editor)', ''];
+        const sfEntryLines = [];
+        
+        for (const f of files) {
+            if (f.name.startsWith('META-INF/')) continue;
+            const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', f.data));
+            const b64 = btoa(String.fromCharCode(...digest));
+            
+            // For MANIFEST.MF
+            mfLines.push(wrapLine('Name: ', f.name));
+            mfLines.push(wrapLine('SHA-256-Digest: ', b64));
+            mfLines.push('');
+            
+            // Calculate entry digest for CERT.SF
+            const entryText = `Name: ${f.name}\r\nSHA-256-Digest: ${b64}\r\n\r\n`;
+            const entryDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(entryText)));
+            sfEntryLines.push({ name: f.name, digest: btoa(String.fromCharCode(...entryDigest)) });
+        }
+        
         const mf = new TextEncoder().encode(mfLines.join('\r\n'));
-        const mfD = new Uint8Array(await crypto.subtle.digest('SHA-256', mf));
-        const sf = new TextEncoder().encode(['Signature-Version: 1.0', `SHA-256-Digest-Manifest: ${btoa(String.fromCharCode(...mfD))}`, 'Created-By: APK Editor', ''].join('\r\n'));
+        const mfDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', mf));
+        
+        // Build CERT.SF
+        const sfLines = [
+            'Signature-Version: 1.0',
+            wrapLine('SHA-256-Digest-Manifest: ', btoa(String.fromCharCode(...mfDigest))),
+            'Created-By: 1.0 (APK Editor)',
+            ''
+        ];
+        
+        // Add per-entry digests
+        for (const entry of sfEntryLines) {
+            sfLines.push(wrapLine('Name: ', entry.name));
+            sfLines.push(wrapLine('SHA-256-Digest: ', entry.digest));
+            sfLines.push('');
+        }
+        
+        const sf = new TextEncoder().encode(sfLines.join('\r\n'));
+        
+        // Sign the SF file
         const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', this.privateKey, sf));
         
-        const dAlg = this.derSeq(this.derOid('2.16.840.1.101.3.4.2.1'), new Uint8Array([0x05, 0x00]));
-        const sAlg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00]));
-        const issuerSerial = this.derSeq(this.derSeq(this.derSet(this.derSeq(this.derOid('2.5.4.3'), this.derUtf8('CN')))), this.derInt(new Uint8Array([1])));
-        const signerInfo = this.derSeq(this.derInt(new Uint8Array([1])), issuerSerial, dAlg, sAlg, this.derOcts(sig));
-        const signedData = this.derSeq(this.derInt(new Uint8Array([1])), this.derSet(dAlg), this.derSeq(this.derOid('1.2.840.113549.1.7.1')), this.concat(new Uint8Array([0xA0]), this.derLen(this.certificate.length), this.certificate), this.derSet(signerInfo));
-        const pkcs7 = this.derSeq(this.derOid('1.2.840.113549.1.7.2'), this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData));
+        // Build PKCS#7 with CORRECT issuer/serial matching certificate
+        const dAlg = this.derSeq(this.derOid('2.16.840.1.101.3.4.2.1'), new Uint8Array([0x05, 0x00])); // SHA-256
+        const sAlg = this.derSeq(this.derOid('1.2.840.113549.1.1.11'), new Uint8Array([0x05, 0x00])); // SHA256withRSA
+        
+        // IssuerAndSerialNumber - MUST match certificate exactly
+        const issuerSerial = this.derSeq(this.certIssuer, this.derInt(this.certSerial));
+        
+        // SignerInfo
+        const signerInfo = this.derSeq(
+            this.derInt(new Uint8Array([1])),  // version
+            issuerSerial,
+            dAlg,
+            sAlg,
+            this.derOcts(sig)
+        );
+        
+        // SignedData
+        const signedData = this.derSeq(
+            this.derInt(new Uint8Array([1])),  // version
+            this.derSet(dAlg),  // digestAlgorithms
+            this.derSeq(this.derOid('1.2.840.113549.1.7.1')),  // contentInfo (data, no content)
+            this.concat(new Uint8Array([0xA0]), this.derLen(this.certificate.length), this.certificate),  // certificates
+            this.derSet(signerInfo)  // signerInfos
+        );
+        
+        // ContentInfo wrapping SignedData
+        const pkcs7 = this.derSeq(
+            this.derOid('1.2.840.113549.1.7.2'),  // signedData OID
+            this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData)
+        );
+        
+        log(`V1 signature created: MF=${mf.length}, SF=${sf.length}, RSA=${pkcs7.length}`, 'success');
         return { mf, sf, rsa: pkcs7 };
     }
     
@@ -1070,7 +1142,16 @@ class APKSigner {
         const s1 = apk.slice(0, cdOff), s3 = apk.slice(cdOff, eocd), s4 = apk.slice(eocd);
         
         const chunks = [];
-        const hash = async d => { for (let i = 0; i < d.length; i += 1048576) { const c = d.slice(i, Math.min(i + 1048576, d.length)), p = new Uint8Array(5 + c.length); p[0] = 0xA5; new DataView(p.buffer).setUint32(1, c.length, true); p.set(c, 5); chunks.push(new Uint8Array(await crypto.subtle.digest('SHA-256', p))); } };
+        const hash = async d => { 
+            for (let i = 0; i < d.length; i += 1048576) { 
+                const c = d.slice(i, Math.min(i + 1048576, d.length));
+                const p = new Uint8Array(5 + c.length); 
+                p[0] = 0xA5; 
+                new DataView(p.buffer).setUint32(1, c.length, true); 
+                p.set(c, 5); 
+                chunks.push(new Uint8Array(await crypto.subtle.digest('SHA-256', p))); 
+            } 
+        };
         await hash(s1); await hash(s3); await hash(s4);
         
         const all = new Uint8Array(chunks.length * 32);
@@ -1120,39 +1201,75 @@ class APKSigner {
     }
 }
 
-// ========== Permission Changes ==========
+// ========== Permission/Authority Changes (AEE Logic) ==========
 function computePermissionChanges(parser, oldPkg, newPkg) {
     const changes = [];
-    let skippedCount = 0;
+    let skippedProtected = 0;
+    let renamedPerms = 0;
+    let prefixedPerms = 0;
+    let renamedAuth = 0;
+    let prefixedAuth = 0;
     
+    // Process permissions
     for (const p of parser.permissions) {
         // Skip ALL protected permissions (system + vendor)
         if (p.isProtected) {
-            skippedCount++;
+            skippedProtected++;
             continue;
         }
         
-        // Only modify permissions that contain the original package name
+        // AEE logic: if permission contains old package name, replace it
         if (p.value.includes(oldPkg)) {
             changes.push({ 
                 idx: p.stringIdx, 
                 val: p.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) 
             });
+            renamedPerms++;
+        } 
+        // AEE logic: if permission has _PERMISSION suffix but doesn't contain package, add suffix
+        else if (p.value.includes('_PERMISSION')) {
+            changes.push({
+                idx: p.stringIdx,
+                val: p.value.replace('_PERMISSION', '_PERMISSION_aee')
+            });
+            prefixedPerms++;
         }
     }
     
-    // Handle authorities (providers)
+    // Process authorities (ContentProvider)
     for (const a of parser.authorities) {
+        // AEE logic: if authority contains old package name, replace it
         if (a.value.includes(oldPkg)) {
             changes.push({ 
                 idx: a.stringIdx, 
                 val: a.value.replace(new RegExp(oldPkg.replace(/\./g, '\\.'), 'g'), newPkg) 
             });
+            renamedAuth++;
+        } 
+        // AEE logic: if authority doesn't contain old package name, add "aee_" prefix
+        else {
+            changes.push({
+                idx: a.stringIdx,
+                val: 'aee_' + a.value
+            });
+            prefixedAuth++;
         }
     }
     
-    if (skippedCount > 0) {
-        log(`Skipped ${skippedCount} protected permissions (system/vendor)`, 'info');
+    if (skippedProtected > 0) {
+        log(`Skipped ${skippedProtected} protected permissions (system/vendor)`, 'info');
+    }
+    if (renamedPerms > 0) {
+        log(`Renamed ${renamedPerms} permissions (package replacement)`, 'info');
+    }
+    if (prefixedPerms > 0) {
+        log(`Suffixed ${prefixedPerms} permissions (_aee)`, 'info');
+    }
+    if (renamedAuth > 0) {
+        log(`Renamed ${renamedAuth} authorities (package replacement)`, 'info');
+    }
+    if (prefixedAuth > 0) {
+        log(`Prefixed ${prefixedAuth} authorities (aee_)`, 'info');
     }
     
     return changes;
@@ -1171,7 +1288,6 @@ document.querySelectorAll('.option-btn').forEach(btn => {
         if (this.dataset.target === 'signing') {
             $('signingDerived').style.display = this.dataset.mode === 'derived' ? 'block' : 'none';
             $('signingCustom').style.display = this.dataset.mode === 'custom' ? 'block' : 'none';
-            $('signingJks').style.display = this.dataset.mode === 'jks' ? 'block' : 'none';
         }
         updateFields();
     });
@@ -1245,10 +1361,11 @@ async function handleFile(file) {
         log(`Version: ${info.versionCode} (${info.versionName})`, 'success');
         log(`SDK: min=${info.minSdk}, target=${info.targetSdk}`, 'success');
         
-        // Log permission stats
+        // Log permission/authority stats
         const protectedPerms = currentParser.permissions.filter(p => p.isProtected).length;
         const customPerms = currentParser.permissions.length - protectedPerms;
-        log(`Permissions: ${customPerms} custom, ${protectedPerms} protected (system/vendor)`, 'info');
+        log(`Permissions: ${customPerms} custom, ${protectedPerms} protected`, 'info');
+        log(`Authorities: ${currentParser.authorities.length}`, 'info');
         
         $('apkInfo').style.display = 'block';
         $('editCard').style.display = 'block';
@@ -1282,12 +1399,22 @@ $('repackBtn').addEventListener('click', async () => {
         let manifest = apkFiles.get('AndroidManifest.xml');
         const changes = [];
         
-        if (modes.package !== 'keep' && info.packageStringIdx !== undefined) changes.push({ idx: info.packageStringIdx, val: newPkg });
-        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined) changes.push({ idx: info.versionNameStringIdx, val: newVN });
-        if (renamePerms && modes.package !== 'keep' && oldPkg !== newPkg) changes.push(...computePermissionChanges(currentParser, oldPkg, newPkg));
+        if (modes.package !== 'keep' && info.packageStringIdx !== undefined) {
+            changes.push({ idx: info.packageStringIdx, val: newPkg });
+        }
+        if (modes.versionName !== 'keep' && info.versionNameStringIdx !== undefined) {
+            changes.push({ idx: info.versionNameStringIdx, val: newVN });
+        }
+        if (renamePerms && modes.package !== 'keep' && oldPkg !== newPkg) {
+            changes.push(...computePermissionChanges(currentParser, oldPkg, newPkg));
+        }
         
         if (changes.length) manifest = new AXMLModifier(manifest).modifyStrings(changes);
-        if (modes.versionCode !== 'keep') { const m = new AXMLModifier(manifest); m.modifyIntAttr('manifest', 'versionCode', newVC); manifest = m.data; }
+        if (modes.versionCode !== 'keep') { 
+            const m = new AXMLModifier(manifest); 
+            m.modifyIntAttr('manifest', 'versionCode', newVC); 
+            manifest = m.data; 
+        }
         
         setProgress(25, 'Building ZIP...');
         
@@ -1314,8 +1441,6 @@ $('repackBtn').addEventListener('click', async () => {
         if (modes.signing === 'custom') {
             signingSeed = $('customSigningSeed').value;
             if (!signingSeed) throw new Error('Enter custom signing seed');
-        } else if (modes.signing === 'jks') {
-            throw new Error('JKS upload not fully implemented - use derived or custom seed');
         } else {
             signingSeed = deriveSigningSeed($('masterSigningKey').value, newPkg);
         }
