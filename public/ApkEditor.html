@@ -297,8 +297,12 @@ const setProgress = (p, t) => {
 
 // ========== URL Parameters ==========
 function getUrlParams() {
+    // 添加调试日志
+    log(`Current URL: ${window.location.href}`, 'info');
+    log(`Query string: ${window.location.search}`, 'info');
+
     const params = new URLSearchParams(window.location.search);
-    return {
+    const result = {
         seed: params.get('seed'),
         masterKey: params.get('masterKey'),
         signingSeed: params.get('signingSeed'),
@@ -310,12 +314,25 @@ function getUrlParams() {
         appNameMode: params.get('appNameMode'),
         renamePerms: params.get('renamePerms'),
     };
+
+    // 记录找到的参数
+    const foundParams = Object.keys(result).filter(key => result[key] !== null);
+    if (foundParams.length > 0) {
+        log(`Found URL parameters: ${foundParams.join(', ')}`, 'info');
+        for (const key of foundParams) {
+            log(`  ${key}: ${result[key]}`, 'info');
+        }
+    } else {
+        log('No URL parameters found', 'info');
+    }
+
+    return result;
 }
 
 function applyUrlParams() {
     const params = getUrlParams();
     let applied = false;
-    
+
     if (params.seed) { $('randomSeed').value = params.seed; applied = true; }
     if (params.masterKey) { $('masterSigningKey').value = params.masterKey; applied = true; }
     if (params.signingSeed) {
@@ -330,10 +347,12 @@ function applyUrlParams() {
     if (params.appName) { $('newAppName').value = params.appName; setMode('appName', 'custom'); applied = true; }
     if (params.appNameMode) { setMode('appName', params.appNameMode); applied = true; }
     if (params.renamePerms === '1') { $('renamePermissions').checked = true; applied = true; }
-    
+
     if (applied) {
         $('urlParamsHint').style.display = 'block';
         log('URL parameters applied', 'success');
+    } else {
+        log('No URL parameters to apply', 'info');
     }
 }
 
@@ -342,7 +361,7 @@ function setMode(target, mode) {
     document.querySelectorAll(`.option-btn[data-target="${target}"]`).forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
     });
-    
+
     if (target === 'signing') {
         $('signingDerived').style.display = mode === 'derived' ? 'block' : 'none';
         $('signingCustom').style.display = mode === 'custom' ? 'block' : 'none';
