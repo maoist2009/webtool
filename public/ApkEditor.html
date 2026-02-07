@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APK Editor - Pure Frontend</title>
+    <title>APK编辑器 - 纯前端</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -122,16 +122,16 @@
 </head>
 <body>
     <div class="container">
-        <h1>🤖 APK Editor</h1>
-        <p class="credit">by <a href="https://github.com/maoist2009">maoist2009</a> with <a href="https://www.anthropic.com/claude/opus">claude opus 4.5 thinking</a> on <a href="https://arena.ai">Arena</a></p>
+        <h1>🤖 APK编辑器</h1>
+        <p class="credit">由 <a href="https://github.com/maoist2009">maoist2009</a> 使用 <a href="https://www.anthropic.com/claude/opus">claude opus 4.5 thinking</a> 在 <a href="https://arena.ai">Arena</a> 上制作</p>
         
         <div class="card">
-            <h2>📁 Upload APK</h2>
+            <h2>📁 上传APK</h2>
             <div class="url-params-hint" id="urlParamsHint" style="display:none">
-                ⚙️ URL parameters detected and applied!
+                ⚙️ 检测到并应用了URL参数！
             </div>
             <div class="upload-zone" id="uploadZone">
-                <p>📦 Drop APK here or click to select</p>
+                <p>📦 将APK拖拽至此或点击选择</p>
             </div>
             <input type="file" id="apkFile" accept=".apk" style="display:none">
             <div id="apkInfo" style="display:none;margin-top:16px">
@@ -147,56 +147,56 @@
         </div>
 
         <div class="card" id="editCard" style="display:none">
-            <h2>✏️ Edit Configuration</h2>
+            <h2>✏️ 编辑配置</h2>
             
             <div class="form-group">
-                <label>Random Seed (for package/name derivation)</label>
+                <label>随机种子（用于包名/名称派生）</label>
                 <input type="text" id="randomSeed" value="apk-editor-2024">
             </div>
 
             <div class="form-group">
-                <label>Package Name</label>
+                <label>包名</label>
                 <div class="option-group">
-                    <button class="option-btn active" data-mode="derived" data-target="package">Derived</button>
-                    <button class="option-btn" data-mode="custom" data-target="package">Custom</button>
-                    <button class="option-btn" data-mode="keep" data-target="package">Keep</button>
+                    <button class="option-btn active" data-mode="derived" data-target="package">派生</button>
+                    <button class="option-btn" data-mode="custom" data-target="package">自定义</button>
+                    <button class="option-btn" data-mode="keep" data-target="package">保持</button>
                 </div>
                 <input type="text" id="newPackage">
             </div>
 
             <div class="row">
                 <div class="form-group">
-                    <label>Version Code</label>
+                    <label>版本代码</label>
                     <div class="option-group">
-                        <button class="option-btn active" data-mode="keep" data-target="versionCode">Keep</button>
-                        <button class="option-btn" data-mode="custom" data-target="versionCode">Custom</button>
+                        <button class="option-btn active" data-mode="keep" data-target="versionCode">保持</button>
+                        <button class="option-btn" data-mode="custom" data-target="versionCode">自定义</button>
                     </div>
                     <input type="number" id="newVersionCode">
                 </div>
                 <div class="form-group">
-                    <label>Version Name</label>
+                    <label>版本名称</label>
                     <div class="option-group">
-                        <button class="option-btn active" data-mode="keep" data-target="versionName">Keep</button>
-                        <button class="option-btn" data-mode="custom" data-target="versionName">Custom</button>
+                        <button class="option-btn active" data-mode="keep" data-target="versionName">保持</button>
+                        <button class="option-btn" data-mode="custom" data-target="versionName">自定义</button>
                     </div>
                     <input type="text" id="newVersionName">
                 </div>
             </div>
 
             <div class="form-group">
-                <label>App Name</label>
+                <label>应用名称</label>
                 <div class="option-group">
-                    <button class="option-btn active" data-mode="keep" data-target="appName">Keep</button>
-                    <button class="option-btn" data-mode="derived" data-target="appName">Derived</button>
-                    <button class="option-btn" data-mode="custom" data-target="appName">Custom</button>
+                    <button class="option-btn active" data-mode="keep" data-target="appName">保持</button>
+                    <button class="option-btn" data-mode="derived" data-target="appName">派生</button>
+                    <button class="option-btn" data-mode="custom" data-target="appName">自定义</button>
                 </div>
                 <input type="text" id="newAppName">
             </div>
 
             <div class="switch-row">
                 <div class="switch-label">
-                    🔐 Rename Custom Permissions & Authorities
-                    <div class="help-text">Follows AEE logic: replaces package in permissions/authorities, adds prefix for others. System/vendor permissions preserved.</div>
+                    🔐 重命名自定义权限和授权
+                    <div class="help-text">遵循AEE逻辑：替换权限/授权中的包名，为其他项添加前缀。系统/供应商权限会被保留。</div>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="renamePermissions">
@@ -205,74 +205,74 @@
             </div>
 
             <div class="signing-section">
-                <h3>🔑 Signing Configuration</h3>
+                <h3>🔑 签名配置</h3>
                 
                 <div class="form-group">
-                    <label>Signing Mode</label>
+                    <label>签名模式</label>
                     <div class="option-group">
-                        <button class="option-btn active" data-mode="derived" data-target="signing">Derived from Master Key</button>
-                        <button class="option-btn" data-mode="custom" data-target="signing">Custom Signing Seed</button>
+                        <button class="option-btn active" data-mode="derived" data-target="signing">从主密钥派生</button>
+                        <button class="option-btn" data-mode="custom" data-target="signing">自定义签名种子</button>
                     </div>
                 </div>
 
                 <div id="signingDerived">
                     <div class="form-group">
-                        <label>Master Signing Key</label>
+                        <label>主签名密钥</label>
                         <input type="text" id="masterSigningKey" value="apk-editor-master-2024">
-                        <div class="help-text">Same master key + same package = same signature (fully deterministic)</div>
+                        <div class="help-text">相同主密钥 + 相同包名 = 相同签名（完全确定性）</div>
                     </div>
                     <div class="seed-display">
-                        Signing Seed: <span id="derivedSigningSeed">-</span>
+                        签名种子: <span id="derivedSigningSeed">-</span>
                     </div>
                 </div>
 
                 <div id="signingCustom" style="display:none">
                     <div class="form-group">
-                        <label>Custom Signing Seed</label>
-                        <input type="text" id="customSigningSeed" placeholder="Enter custom signing seed">
-                        <div class="help-text">Apps with same signing seed will have identical signatures</div>
+                        <label>自定义签名种子</label>
+                        <input type="text" id="customSigningSeed" placeholder="输入自定义签名种子">
+                        <div class="help-text">具有相同签名种子的应用将具有相同的签名</div>
                     </div>
                 </div>
             </div>
 
             <button class="btn btn-primary" id="repackBtn" style="width:100%;margin-top:16px">
-                🔧 Repack APK (V1+V2 Signature)
+                🔧 重新打包APK (V1+V2签名)
             </button>
 
             <div class="progress-container" id="progressContainer">
                 <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-                <div class="progress-text" id="progressText">Processing...</div>
+                <div class="progress-text" id="progressText">处理中...</div>
             </div>
         </div>
 
         <div class="card" id="logCard" style="display:none">
             <div class="log-header">
-                <h2>📋 Log</h2>
-                <button class="btn btn-small" onclick="copyLog()">📋 Copy</button>
+                <h2>📋 日志</h2>
+                <button class="btn btn-small" onclick="copyLog()">📋 复制</button>
             </div>
             <div class="log" id="logContainer"></div>
         </div>
         
         <div class="card">
-            <h2>📖 URL Parameters</h2>
+            <h2>📖 URL参数</h2>
             <div class="help-text" style="font-size:13px;line-height:1.6">
-                <p>Supported URL parameters:</p>
+                <p>支持的URL参数：</p>
                 <ul style="margin-left:20px;margin-top:8px">
-                    <li><code>seed</code> - Random seed for derivation</li>
-                    <li><code>masterKey</code> - Master signing key</li>
-                    <li><code>signingSeed</code> - Custom signing seed (overrides derived)</li>
-                    <li><code>package</code> - Custom package name</li>
-                    <li><code>packageMode</code> - derived/custom/keep</li>
-                    <li><code>versionCode</code> - Custom version code</li>
-                    <li><code>versionName</code> - Custom version name</li>
-                    <li><code>appName</code> - Custom app name</li>
-                    <li><code>renamePerms</code> - 1/0 to rename permissions</li>
+                    <li><code>seed</code> - 用于派生的随机种子</li>
+                    <li><code>masterKey</code> - 主签名密钥</li>
+                    <li><code>signingSeed</code> - 自定义签名种子（覆盖派生）</li>
+                    <li><code>package</code> - 自定义包名</li>
+                    <li><code>packageMode</code> - 派生/自定义/保持</li>
+                    <li><code>versionCode</code> - 自定义版本代码</li>
+                    <li><code>versionName</code> - 自定义版本名称</li>
+                    <li><code>appName</code> - 自定义应用名称</li>
+                    <li><code>renamePerms</code> - 1/0 表示是否重命名权限</li>
                 </ul>
-                <p style="margin-top:8px">Example: <code>?masterKey=mykey&packageMode=keep</code></p>
+                <p style="margin-top:8px">示例: <code>?masterKey=mykey&packageMode=keep</code></p>
             </div>
         </div>
     </div>
-    <div class="toast" id="toast">Copied!</div>
+    <div class="toast" id="toast">已复制！</div>
 
 <script>
 // ========== Utilities ==========
@@ -350,9 +350,9 @@ function applyUrlParams() {
 
     if (applied) {
         $('urlParamsHint').style.display = 'block';
-        log('URL parameters applied', 'success');
+        log('URL参数已应用', 'success');
     } else {
-        log('No URL parameters to apply', 'info');
+        log('没有要应用的URL参数', 'info');
     }
 }
 
@@ -509,13 +509,13 @@ class DeterministicRSA {
     }
     
     async generate() {
-        log('Generating deterministic RSA-2048 key pair...', 'info');
+        log('正在生成确定性RSA-2048密钥对...', 'info');
         
         const p = await this.generatePrime(1024);
-        log('Generated first prime', 'info');
-        
+        log('已生成第一个质数', 'info');
+
         const q = await this.generatePrime(1024);
-        log('Generated second prime', 'info');
+        log('已生成第二个质数', 'info');
         
         const n = p * q;
         const phi = (p - 1n) * (q - 1n);
@@ -556,7 +556,7 @@ class DeterministicRSA {
         
         const publicKeyDer = new Uint8Array(await crypto.subtle.exportKey('spki', publicKey));
         
-        log('Deterministic key pair generated successfully', 'success');
+        log('确定性密钥对生成成功', 'success');
         return { privateKey, publicKey, publicKeyDer };
     }
 }
@@ -1003,7 +1003,7 @@ class APKSigner {
     derUtc(d) { const pad = n => n.toString().padStart(2, '0'); const s = `${pad(d.getUTCFullYear() % 100)}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; return this.concat(new Uint8Array([0x17, s.length]), new TextEncoder().encode(s)); }
     
     async generateFromSeed(seed, cn) {
-        log(`Using signing seed: ${seed}`, 'info');
+        log(`使用签名种子: ${seed}`, 'info');
         const rsa = new DeterministicRSA(seed);
         const { privateKey, publicKeyDer } = await rsa.generate();
         this.privateKey = privateKey;
@@ -1049,11 +1049,11 @@ class APKSigner {
         );
         const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privKey, tbs));
         this.certificate = this.derSeq(tbs, alg, this.derBits(sig));
-        log(`Certificate: ${this.certificate.length} bytes (deterministic)`, 'success');
+        log(`证书: ${this.certificate.length} 字节 (确定性)`, 'success');
     }
     
     async signV1(files) {
-        log('Creating V1 signature...', 'info');
+        log('正在创建V1签名...', 'info');
         
         // Line wrapping function for JAR manifest (max 72 chars per line)
         const wrapLine = (prefix, value) => {
@@ -1146,12 +1146,12 @@ class APKSigner {
             this.concat(new Uint8Array([0xA0]), this.derLen(signedData.length), signedData)
         );
         
-        log(`V1 signature created: MF=${mf.length}, SF=${sf.length}, RSA=${pkcs7.length}`, 'success');
+        log(`V1签名已创建: MF=${mf.length}, SF=${sf.length}, RSA=${pkcs7.length}`, 'success');
         return { mf, sf, rsa: pkcs7 };
     }
     
     async signV2(apk) {
-        log('Creating V2 signature...', 'info');
+        log('正在创建V2签名...', 'info');
         const view = new DataView(apk.buffer, apk.byteOffset, apk.byteLength);
         let eocd = -1;
         for (let i = apk.length - 22; i >= Math.max(0, apk.length - 65557); i--) if (view.getUint32(i, true) === 0x06054B50) { eocd = i; break; }
@@ -1215,7 +1215,7 @@ class APKSigner {
         result.set(s4, s1.length + block.length + s3.length);
         new DataView(result.buffer).setUint32(s1.length + block.length + s3.length + 16, newCd, true);
         
-        log(`V2 signed: ${result.length} bytes`, 'success');
+        log(`V2签名完成: ${result.length} 字节`, 'success');
         return result;
     }
 }
@@ -1276,19 +1276,19 @@ function computePermissionChanges(parser, oldPkg, newPkg) {
     }
     
     if (skippedProtected > 0) {
-        log(`Skipped ${skippedProtected} protected permissions (system/vendor)`, 'info');
+        log(`跳过 ${skippedProtected} 个受保护权限 (系统/厂商)`, 'info');
     }
     if (renamedPerms > 0) {
-        log(`Renamed ${renamedPerms} permissions (package replacement)`, 'info');
+        log(`重命名 ${renamedPerms} 个权限 (包名替换)`, 'info');
     }
     if (prefixedPerms > 0) {
-        log(`Suffixed ${prefixedPerms} permissions (_aee)`, 'info');
+        log(`后缀 ${prefixedPerms} 个权限 (_aee)`, 'info');
     }
     if (renamedAuth > 0) {
-        log(`Renamed ${renamedAuth} authorities (package replacement)`, 'info');
+        log(`重命名 ${renamedAuth} 个授权 (包名替换)`, 'info');
     }
     if (prefixedAuth > 0) {
-        log(`Prefixed ${prefixedAuth} authorities (aee_)`, 'info');
+        log(`前缀 ${prefixedAuth} 个授权 (aee_)`, 'info');
     }
     
     return changes;
@@ -1346,26 +1346,26 @@ uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classL
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
 
 async function handleFile(file) {
-    if (!file.name.toLowerCase().endsWith('.apk')) { alert('Please select an APK file'); return; }
+    if (!file.name.toLowerCase().endsWith('.apk')) { alert('请选择一个APK文件'); return; }
     
     $('logContainer').innerHTML = '';
     $('logCard').style.display = 'block';
-    log(`Loading: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+    log(`正在加载: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
     
     try {
         currentApk = await file.arrayBuffer();
         const zip = new ZipReader(currentApk);
-        log(`ZIP entries: ${zip.entries.size}`, 'info');
-        
+        log(`ZIP条目: ${zip.entries.size}`, 'info');
+
         const manifest = await zip.getEntry('AndroidManifest.xml');
-        if (!manifest) throw new Error('AndroidManifest.xml not found');
+        if (!manifest) throw new Error('未找到AndroidManifest.xml');
         
         currentParser = new AXMLParser(manifest);
         
         apkFiles = new Map();
         for (const [name] of zip.entries) {
             try { const d = await zip.getEntry(name); if (d) apkFiles.set(name, d); }
-            catch (e) { log(`Skip: ${name}`, 'warn'); }
+            catch (e) { log(`跳过: ${name}`, 'warn'); }
         }
         
         const info = currentParser.info;
@@ -1376,48 +1376,48 @@ async function handleFile(file) {
         $('origMinSdk').textContent = info.minSdk ?? '?';
         $('origTargetSdk').textContent = info.targetSdk ?? '?';
         
-        log(`Package: ${info.package}`, 'success');
-        log(`Version: ${info.versionCode} (${info.versionName})`, 'success');
-        log(`SDK: min=${info.minSdk}, target=${info.targetSdk}`, 'success');
+        log(`包名: ${info.package}`, 'success');
+        log(`版本: ${info.versionCode} (${info.versionName})`, 'success');
+        log(`SDK: 最小=${info.minSdk}, 目标=${info.targetSdk}`, 'success');
         
         // Log permission/authority stats
         const protectedPerms = currentParser.permissions.filter(p => p.isProtected).length;
         const customPerms = currentParser.permissions.length - protectedPerms;
-        log(`Permissions: ${customPerms} custom, ${protectedPerms} protected`, 'info');
-        log(`Authorities: ${currentParser.authorities.length}`, 'info');
+        log(`权限: ${customPerms} 个自定义, ${protectedPerms} 个受保护`, 'info');
+        log(`授权: ${currentParser.authorities.length}`, 'info');
         
         $('apkInfo').style.display = 'block';
         $('editCard').style.display = 'block';
         updateFields();
     } catch (e) {
-        log(`Error: ${e.message}`, 'error');
+        log(`错误: ${e.message}`, 'error');
         console.error(e);
     }
 }
 
 $('repackBtn').addEventListener('click', async () => {
-    if (!currentApk || !currentParser) { alert('Load APK first'); return; }
+    if (!currentApk || !currentParser) { alert('请先加载APK'); return; }
     
     $('repackBtn').disabled = true;
     $('progressContainer').style.display = 'block';
     
     try {
-        setProgress(5, 'Preparing...');
-        
+        setProgress(5, '准备中...');
+
         const info = currentParser.info;
         const oldPkg = info.package || '', newPkg = $('newPackage').value || oldPkg;
         const newVC = parseInt($('newVersionCode').value) || info.versionCode || 1;
         const newVN = $('newVersionName').value || info.versionName || '1.0';
         const renamePerms = $('renamePermissions').checked;
-        
-        log(`Package: ${newPkg}`, 'info');
-        log(`Version: ${newVC} (${newVN})`, 'info');
-        
-        setProgress(10, 'Modifying manifest...');
-        
+
+        log(`包名: ${newPkg}`, 'info');
+        log(`版本: ${newVC} (${newVN})`, 'info');
+
+        setProgress(10, '修改清单文件...');
+
         let manifest = apkFiles.get('AndroidManifest.xml');
         const changes = [];
-        
+
         if (modes.package !== 'keep' && info.packageStringIdx !== undefined) {
             changes.push({ idx: info.packageStringIdx, val: newPkg });
         }
@@ -1427,19 +1427,19 @@ $('repackBtn').addEventListener('click', async () => {
         if (renamePerms && modes.package !== 'keep' && oldPkg !== newPkg) {
             changes.push(...computePermissionChanges(currentParser, oldPkg, newPkg));
         }
-        
+
         if (changes.length) manifest = new AXMLModifier(manifest).modifyStrings(changes);
-        if (modes.versionCode !== 'keep') { 
-            const m = new AXMLModifier(manifest); 
-            m.modifyIntAttr('manifest', 'versionCode', newVC); 
-            manifest = m.data; 
+        if (modes.versionCode !== 'keep') {
+            const m = new AXMLModifier(manifest);
+            m.modifyIntAttr('manifest', 'versionCode', newVC);
+            manifest = m.data;
         }
-        
-        setProgress(25, 'Building ZIP...');
-        
+
+        setProgress(25, '构建ZIP...');
+
         const zip = new ZipWriter(), toSign = [];
         const sorted = [...apkFiles.entries()].filter(([n]) => !n.startsWith('META-INF/')).sort((a, b) => a[0].localeCompare(b[0]));
-        
+
         for (const [name, data] of sorted) {
             const fData = name === 'AndroidManifest.xml' ? manifest : data;
             let compress = true, alignment = 0;
@@ -1449,50 +1449,50 @@ $('repackBtn').addEventListener('click', async () => {
             zip.addFile(name, fData, { compress, alignment });
             toSign.push({ name, data: fData });
         }
-        
-        log(`Files: ${toSign.length}`, 'info');
-        
-        setProgress(40, 'Generating signing key...');
-        
+
+        log(`文件: ${toSign.length}`, 'info');
+
+        setProgress(40, '生成签名密钥...');
+
         const signer = new APKSigner();
         let signingSeed;
-        
+
         if (modes.signing === 'custom') {
             signingSeed = $('customSigningSeed').value;
-            if (!signingSeed) throw new Error('Enter custom signing seed');
+            if (!signingSeed) throw new Error('请输入自定义签名种子');
         } else {
             signingSeed = deriveSigningSeed($('masterSigningKey').value, newPkg);
         }
-        
+
         await signer.generateFromSeed(signingSeed, newPkg);
-        
-        setProgress(60, 'V1 signature...');
+
+        setProgress(60, 'V1签名...');
         const v1 = await signer.signV1(toSign);
         zip.addFile('META-INF/MANIFEST.MF', v1.mf, { compress: false, alignment: 0 });
         zip.addFile('META-INF/CERT.SF', v1.sf, { compress: false, alignment: 0 });
         zip.addFile('META-INF/CERT.RSA', v1.rsa, { compress: false, alignment: 0 });
-        
-        setProgress(75, 'Building APK...');
+
+        setProgress(75, '构建APK...');
         let apk = await zip.build();
-        log(`Pre-V2: ${apk.length} bytes`, 'info');
-        
-        setProgress(85, 'V2 signature...');
+        log(`预V2: ${apk.length} 字节`, 'info');
+
+        setProgress(85, 'V2签名...');
         apk = await signer.signV2(apk);
-        
-        setProgress(95, 'Downloading...');
+
+        setProgress(95, '下载中...');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([apk], { type: 'application/vnd.android.package-archive' }));
         a.download = `${newPkg.split('.').pop()}_v${newVC}.apk`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        
-        setProgress(100, 'Done!');
-        log(`Complete: ${(apk.length / 1048576).toFixed(2)} MB`, 'success');
+
+        setProgress(100, '完成！');
+        log(`完成: ${(apk.length / 1048576).toFixed(2)} MB`, 'success');
     } catch (e) {
-        log(`Error: ${e.message}`, 'error');
+        log(`错误: ${e.message}`, 'error');
         console.error(e);
-        setProgress(0, 'Failed');
+        setProgress(0, '失败');
     } finally {
         $('repackBtn').disabled = false;
     }
