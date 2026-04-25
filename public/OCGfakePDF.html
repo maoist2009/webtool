@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>私密双层 PDF 生成器 - Private Dual-Layer PDF</title>
+    <!-- Tailwind Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PDF-Lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- Faker.js (v5 for stable global browser bundle) -->
+    <script src="https://cdn.jsdelivr.net/npm/faker@5.5.3/dist/faker.min.js"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .mesh-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -10;
+            background-color: white;
+        }
+        .mesh-gradient-1 {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 24rem;
+            background: linear-gradient(to bottom, rgba(79, 70, 229, 0.05), transparent);
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-900 font-sans selection:bg-indigo-100 overflow-x-hidden" x-data="pdfGenerator()">
+    <div class="mesh-bg">
+        <div class="mesh-gradient-1"></div>
+    </div>
+
+    <div class="max-w-xl mx-auto px-6 py-16 md:py-24">
+        <header class="mb-12">
+            <div class="flex items-center justify-between mb-6">
+                <div class="inline-flex items-center px-2 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em] rounded border border-indigo-100">
+                    Standalone Engine v3.0
+                </div>
+                <button @click="toggleLang()" class="flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-indigo-600 transition-colors">
+                    <i data-lucide="languages" class="w-3.5 h-3.5"></i>
+                    <span x-text="lang === 'en' ? '中文' : 'English'"></span>
+                </button>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6 leading-[1.1]">
+                <template x-if="lang === 'en'">
+                    <span>Private <span class="text-indigo-600">Dual-Layer</span> PDF Generator.</span>
+                </template>
+                <template x-if="lang === 'cn'">
+                    <span>私密<span class="text-indigo-600">双层</span> PDF 生成器。</span>
+                </template>
+            </h1>
+            <p class="text-slate-600 text-lg leading-relaxed max-w-sm" x-text="t().subtitle"></p>
+        </header>
+
+        <main class="space-y-4">
+            <!-- Real PDF Dropzone -->
+            <div @click="$refs.realInput.click()" 
+                 class="relative border-2 border-dashed rounded-2xl p-6 transition-all duration-300 group cursor-pointer"
+                 :class="realFile ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'">
+                <input type="file" x-ref="realInput" accept="application/pdf" class="hidden" @change="handleFile($event, 'real')">
+                <div class="flex items-center space-x-4">
+                    <div class="p-4 rounded-xl transition-colors" :class="realFile ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'">
+                        <i :data-lucide="realFile ? 'file-text' : 'shield-alert'" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                            <span x-text="realFile ? realFile.name : t().realLabel"></span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1" x-text="realFile ? (realFile.size / 1024 / 1024).toFixed(2) + ' MB' : t().realDesc"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fake PDF Dropzone -->
+            <div @click="$refs.fakeInput.click()" 
+                 class="relative border-2 border-dashed rounded-2xl p-6 transition-all duration-300 group cursor-pointer"
+                 :class="fakeFile ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'">
+                <input type="file" x-ref="fakeInput" accept="application/pdf" class="hidden" @change="handleFile($event, 'fake')">
+                <div class="flex items-center space-x-4">
+                    <div class="p-4 rounded-xl transition-colors" :class="fakeFile ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'">
+                        <i :data-lucide="fakeFile ? 'file-text' : 'sparkles'" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                            <span x-text="fakeFile ? fakeFile.name : t().fakeLabel"></span>
+                            <span x-show="!fakeFile" class="text-[10px] ml-2 px-1.5 py-0.5 bg-slate-200 text-slate-500 rounded uppercase tracking-wider" x-text="t().autoGen"></span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1" x-text="fakeFile ? (fakeFile.size / 1024 / 1024).toFixed(2) + ' MB' : t().fakeDesc"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button @click="processDualLayerPDF()"
+                        :disabled="loading || !realFile"
+                        class="w-full relative group overflow-hidden flex items-center justify-center space-x-3 py-4 px-6 rounded-2xl font-bold transition-all duration-300"
+                        :class="loading || !realFile ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-200 active:scale-[0.98]'">
+                    <template x-if="loading">
+                        <div class="flex items-center justify-center space-x-2">
+                             <span class="animate-pulse" x-text="t().btnGenerating"></span>
+                        </div>
+                    </template>
+                    <template x-if="!loading">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="download" class="w-5 h-5 group-hover:translate-y-0.5 transition-transform"></i>
+                            <span x-text="t().btnGenerate"></span>
+                        </div>
+                    </template>
+                </button>
+            </div>
+
+            <!-- Status Indicator -->
+            <div x-show="status" x-transition class="flex items-center space-x-2 text-xs font-medium text-slate-400 pl-1 mt-2">
+                <i data-lucide="files" class="w-3 h-3"></i>
+                <span x-text="status"></span>
+            </div>
+
+            <!-- Error message -->
+            <div x-show="error" x-transition x-cloak class="mt-4 p-4 bg-red-50 text-red-600 rounded-xl text-xs font-semibold border border-red-100" x-text="error"></div>
+
+            <!-- Compatibility Matrix -->
+            <div class="mt-12 bg-slate-900 rounded-2xl p-6 text-slate-300">
+                <h3 class="text-white text-sm font-bold mb-4 flex items-center">
+                    <i data-lucide="shield-alert" class="w-4 h-4 mr-2 text-indigo-400"></i>
+                    <span x-text="t().compatTitle"></span>
+                </h3>
+                
+                <!-- Definition Explanation -->
+                <div class="grid grid-cols-3 gap-2 mb-4 text-[9px] uppercase tracking-tighter text-slate-500 font-bold border-b border-slate-800 pb-2">
+                    <div>
+                        <div class="text-indigo-400" x-text="t().compatView"></div>
+                        <div class="font-normal normal-case opacity-60" x-text="lang === 'en' ? 'Normal screen viewing' : '常规屏幕查看'"></div>
+                    </div>
+                    <div>
+                        <div class="text-indigo-400" x-text="t().compatPreview"></div>
+                        <div class="font-normal normal-case opacity-60" x-text="lang === 'en' ? 'System print dialog' : '系统打印对话框'"></div>
+                    </div>
+                    <div>
+                        <div class="text-indigo-400" x-text="t().compatPrint"></div>
+                        <div class="font-normal normal-case opacity-60" x-text="lang === 'en' ? 'Ink on physical paper' : '物理纸张墨迹输出'"></div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-[11px] font-mono border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-slate-500">
+                                <th class="text-left py-2 pr-4 uppercase tracking-tighter text-[9px]" x-text="t().compatEnvironment"></th>
+                                <th class="text-center py-2 pr-4 uppercase tracking-tighter text-[9px]" x-text="t().compatView"></th>
+                                <th class="text-center py-2 pr-4 uppercase tracking-tighter text-[9px]" x-text="t().compatPreview"></th>
+                                <th class="text-center py-2 uppercase tracking-tighter text-[9px]" x-text="t().compatPrint"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 pr-4 font-bold text-slate-200">Chrome / Chromium 140+</td>
+                                <td class="py-2 pr-4 text-green-400 text-center">Fake</td>
+                                <td class="py-2 pr-4 text-blue-400 text-center">Real</td>
+                                <td class="py-2 text-blue-400 text-center">Real</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 pr-4 font-bold text-slate-200">Acrobat Reader / Foxit</td>
+                                <td class="py-2 pr-4 text-green-400 text-center">Fake</td>
+                                <td class="py-2 pr-4 text-blue-400 text-center">Real</td>
+                                <td class="py-2 text-blue-400 text-center">Real</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 pr-4 font-bold text-slate-200">WPS (PC)</td>
+                                <td class="py-2 pr-4 text-green-400 text-center">Fake</td>
+                                <td class="py-2 pr-4 text-blue-400 text-center text-[10px]">Real (Full)</td>
+                                <td class="py-2 text-blue-400 text-center">Real</td>
+                            </tr>
+                            <tr class="border-b border-slate-800">
+                                <td class="py-2 pr-4 font-bold text-slate-200">Edge 147+ / Android</td>
+                                <td class="py-2 pr-4 text-green-400 text-center">Fake</td>
+                                <td class="py-2 pr-4 text-red-500 text-center">Fake ⚠️</td>
+                                <td class="py-2 text-red-500 text-center">Fake ⚠️</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 pr-4 font-bold text-slate-200">MuPDF / PyMuPDF 1.23+</td>
+                                <td class="py-2 pr-4 text-green-400 text-center">Fake</td>
+                                <td class="py-2 pr-4 text-slate-500 text-center">-</td>
+                                <td class="py-2 text-slate-500 text-center">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                    <p class="text-[10px] leading-relaxed text-indigo-200 italic" x-text="t().compatWarning"></p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="mt-16 pt-8 border-t border-slate-100">
+            <div class="grid grid-cols-2 gap-8">
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" x-text="t().tech"></h4>
+                    <p class="text-[11px] text-slate-500 leading-relaxed font-mono" x-text="t().techDesc"></p>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3" x-text="t().privacy"></h4>
+                    <p class="text-[11px] text-slate-500 leading-relaxed font-mono" x-text="t().privacyDesc"></p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        function pdfGenerator() {
+            return {
+                lang: 'cn',
+                realFile: null,
+                fakeFile: null,
+                loading: false,
+                status: '',
+                error: '',
+                
+                init() {
+                    lucide.createIcons();
+                },
+
+                t() {
+                    const dict = {
+                        en: {
+                            subtitle: "Secures documents by masking them with fake content on-screen. Fully client-side processing.",
+                            realLabel: "Real Secret PDF",
+                            realDesc: "Hidden on screen, revealed on paper.",
+                            fakeLabel: "Fake Cover PDF",
+                            fakeDesc: "Visible on screen. Auto-generated if empty.",
+                            btnGenerate: "Generate Secure PDF",
+                            btnGenerating: "Generating...",
+                            autoGen: "Auto-Gen",
+                            tech: "Technology",
+                            techDesc: "OCG-based logic bypassing OCR via structural layer manipulation.",
+                            privacy: "Privacy",
+                            privacyDesc: "No files leave your browser. Zero server footprint.",
+                            statusReading: "Reading real PDF...",
+                            statusFake: "Preparing fake layer...",
+                            statusGenerating: "Generating dense fake content...",
+                            statusInit: "Initializing PDF layers...",
+                            statusOverlay: (count) => `Overlaying ${count} pages...`,
+                            statusFinalizing: "Compressing and finalizing...",
+                            statusDone: "Done!",
+                            compatTitle: "Compatibility Reference (OCG Spec)",
+                            compatEnvironment: "Environment",
+                            compatView: "View",
+                            compatPreview: "Print Preview",
+                            compatPrint: "Physical Print",
+                            compatWarning: "CRITICAL WARNING: Some PDF viewers fail to trigger the OCG /AS state switch. Always test with a virtual printer.",
+                            fakeOCGName: "Screen View (Fake)",
+                            realOCGName: "Physical Print (Real)"
+                        },
+                        cn: {
+                            subtitle: "通过在屏幕上显示虚假内容来保护文档。完全在浏览器内处理。",
+                            realLabel: "真实机密 PDF",
+                            realDesc: "屏幕中隐藏，打印时显现。",
+                            fakeLabel: "虚假封面 PDF",
+                            fakeDesc: "屏幕中可见。如果为空，将自动生成。",
+                            btnGenerate: "生成加密 PDF",
+                            btnGenerating: "正在生成...",
+                            autoGen: "自动生成",
+                            tech: "技术原理",
+                            techDesc: "基于 OCG 的逻辑，通过结构层操作绕过 OCR 识别。",
+                            privacy: "隐私保护",
+                            privacyDesc: "文件不会离开浏览器。零服务器足迹。",
+                            statusReading: "正在读取真实 PDF...",
+                            statusFake: "正在准备虚假层...",
+                            statusGenerating: "正在生成高密度虚假内容...",
+                            statusInit: "正在初始化 PDF 层...",
+                            statusOverlay: (count) => `正在叠加 ${count} 个页面...`,
+                            statusFinalizing: "正在压缩并完成...",
+                            statusDone: "完成！",
+                            compatTitle: "兼容性参考 (基于 OCG 规范)",
+                            compatEnvironment: "测试环境",
+                            compatView: "查看视图",
+                            compatPreview: "打印预览",
+                            compatPrint: "物理打印",
+                            compatWarning: "重要警告：部分查看器无法触发 OCG 状态切换。在物理打印前，请先用虚拟打印机进行测试。",
+                            fakeOCGName: "屏幕查看 (伪装层)",
+                            realOCGName: "物理打印 (真实层)"
+                        }
+                    };
+                    return dict[this.lang];
+                },
+
+                toggleLang() {
+                    this.lang = this.lang === 'en' ? 'cn' : 'en';
+                },
+
+                handleFile(e, type) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this[type + 'File'] = file;
+                        this.error = '';
+                    }
+                },
+
+                async generateFakePDF(pageWidth, pageHeight, pageCount) {
+                    const { PDFDocument, PDFName, PDFOperator, PDFOperatorNames, rgb } = PDFLib;
+                    const doc = await PDFDocument.create();
+                    
+                    // Access faker from window to be safe
+                    const f = window.faker || {};
+                    const getSentence = (n) => f.lorem ? f.lorem.sentence(n) : "Placeholder Title Text Support System";
+                    const getPara = (n) => f.lorem ? f.lorem.paragraphs(n, '\n\n') : "Placeholder content body text for the fake layer...";
+
+                    const templates = Array.from({ length: 3 }, () => ({
+                        title: getSentence(8),
+                        subtitle: getSentence(12),
+                        body: getPara(30) // More paragraphs
+                    }));
+
+                    for (let i = 0; i < pageCount; i++) {
+                        const page = doc.addPage([pageWidth, pageHeight]);
+                        const content = templates[i % templates.length];
+                        const margin = 50;
+                        const contentWidth = pageWidth - (margin * 2);
+
+                        // Draw main title
+                        page.drawText(content.title, { 
+                            x: margin, 
+                            y: pageHeight - 60, 
+                            size: 20, 
+                            maxWidth: contentWidth,
+                            color: rgb(0.1, 0.1, 0.1)
+                        });
+
+                        // Draw subtitle
+                        page.drawText(content.subtitle, { 
+                            x: margin, 
+                            y: pageHeight - 110, 
+                            size: 13, 
+                            maxWidth: contentWidth,
+                            color: rgb(0.3, 0.3, 0.3)
+                        });
+
+                        // Draw body text - we'll try to draw a lot to fill the page
+                        page.drawText(content.body, { 
+                            x: margin, 
+                            y: pageHeight - 150, 
+                            size: 8.5, 
+                            maxWidth: contentWidth, 
+                            lineHeight: 11,
+                            color: rgb(0.2, 0.2, 0.2)
+                        });
+
+                        // Footer
+                        page.drawText(`Internal Document ID: ${Math.random().toString(36).substr(2, 9).toUpperCase()} | Page ${i + 1} / ${pageCount}`, { 
+                            x: margin, 
+                            y: 40, 
+                            size: 7,
+                            color: rgb(0.5, 0.5, 0.5)
+                        });
+                    }
+                    return await doc.save();
+                },
+
+                async processDualLayerPDF() {
+                    const { PDFDocument, PDFName, PDFOperator, PDFOperatorNames, PDFDict } = PDFLib;
+                    if (!this.realFile) return;
+
+                    this.loading = true;
+                    this.status = this.t().statusReading;
+                    this.error = '';
+
+                    try {
+                        const realBuffer = await this.realFile.arrayBuffer();
+                        const realPdfDoc = await PDFDocument.load(realBuffer);
+                        const pageCount = realPdfDoc.getPageCount();
+                        const firstPage = realPdfDoc.getPage(0);
+                        const { width, height } = firstPage.getSize();
+
+                        this.status = this.t().statusFake;
+                        let fakePdfDoc;
+                        if (this.fakeFile) {
+                            const fakeBuffer = await this.fakeFile.arrayBuffer();
+                            fakePdfDoc = await PDFDocument.load(fakeBuffer);
+                        } else {
+                            this.status = this.t().statusGenerating;
+                            const fakeBytes = await this.generateFakePDF(width, height, pageCount);
+                            fakePdfDoc = await PDFDocument.load(fakeBytes);
+                        }
+
+                        this.status = this.t().statusInit;
+                        const mergedDoc = await PDFDocument.create();
+                        const context = mergedDoc.context;
+
+                        const ocgFake = context.obj({
+                            Type: 'OCG',
+                            Name: this.t().fakeOCGName,
+                            Usage: { Print: { Subtype: 'Print', PrintState: 'OFF' }, View: { ViewState: 'ON' } }
+                        });
+                        const ocgFakeRef = context.register(ocgFake);
+
+                        const ocgReal = context.obj({
+                            Type: 'OCG',
+                            Name: this.t().realOCGName,
+                            Usage: { Print: { Subtype: 'Print', PrintState: 'ON' }, View: { ViewState: 'OFF' } }
+                        });
+                        const ocgRealRef = context.register(ocgReal);
+
+                        const sharedProperties = context.obj({ ocFake: ocgFakeRef, ocReal: ocgRealRef });
+
+                        const ocProperties = context.obj({
+                            OCGs: [ocgFakeRef, ocgRealRef],
+                            D: {
+                                Order: [ocgFakeRef, ocgRealRef],
+                                ON: [ocgFakeRef], OFF: [ocgRealRef],
+                                AS: [{ Event: 'View', Category: ['View'] }, { Event: 'Print', Category: ['Print'] }]
+                            }
+                        });
+                        mergedDoc.catalog.set(PDFName.of('OCProperties'), ocProperties);
+
+                        this.status = this.t().statusOverlay(pageCount);
+                        const realPages = await mergedDoc.embedPages(realPdfDoc.getPages());
+                        const fakePages = await mergedDoc.embedPages(fakePdfDoc.getPages());
+
+                        const bdcFake = PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [PDFName.of('OC'), PDFName.of('ocFake')]);
+                        const bdcReal = PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [PDFName.of('OC'), PDFName.of('ocReal')]);
+                        const emc = PDFOperator.of(PDFOperatorNames.EndMarkedContent, []);
+
+                        for (let i = 0; i < pageCount; i++) {
+                            const page = mergedDoc.addPage([width, height]);
+                            const realEmbedded = realPages[i];
+                            const fakeEmbedded = fakePages[i % fakePages.length];
+
+                            page.pushOperators(bdcReal);
+                            page.drawPage(realEmbedded);
+                            page.pushOperators(emc);
+
+                            page.pushOperators(bdcFake);
+                            page.drawPage(fakeEmbedded);
+                            page.pushOperators(emc);
+
+                            let resources = page.node.get(PDFName.of('Resources'));
+                            if (!resources) {
+                                resources = context.obj({});
+                                page.node.set(PDFName.of('Resources'), resources);
+                            }
+                            resources.set(PDFName.of('Properties'), sharedProperties);
+                        }
+
+                        this.status = this.t().statusFinalizing;
+                        const pdfBytes = await mergedDoc.save({ useObjectStreams: true });
+                        
+                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `DualLayer_${this.realFile.name}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+
+                        this.status = this.t().statusDone;
+                        lucide.createIcons();
+                    } catch (err) {
+                        console.error(err);
+                        this.error = `Error: ${err.message}`;
+                    } finally {
+                        this.loading = false;
+                        setTimeout(() => { this.status = ''; }, 5000);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
