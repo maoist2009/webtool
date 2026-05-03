@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena Project Extractor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --success: #10b981;
+            --error: #ef4444;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--text-primary);
+        }
+
+        .container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 640px;
+            width: 100%;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 48px 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.02);
+            position: relative;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .drop-zone svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--text-secondary);
+            margin-bottom: 16px;
+            opacity: 0.6;
+        }
+
+        .drop-zone h3 {
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .drop-zone .hint {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .status-panel {
+            margin-top: 24px;
+            padding: 16px;
+            border-radius: 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .status-panel.show {
+            display: block;
+        }
+
+        .status-panel.success { border-color: var(--success); }
+        .status-panel.error { border-color: var(--error); }
+        .status-panel.loading { border-color: var(--accent); }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .status-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .status-panel.success .status-icon { color: var(--success); }
+        .status-panel.error .status-icon { color: var(--error); }
+
+        .status-title {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .status-panel.success .status-title { color: var(--success); }
+        .status-panel.error .status-title { color: var(--error); }
+
+        .status-details {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-left: 30px;
+        }
+
+        .file-list {
+            margin-top: 12px;
+            max-height: 240px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .file-item {
+            padding: 4px 0;
+            color: #cbd5e1;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .file-item:last-child { border-bottom: none; }
+        
+        .file-size {
+            color: #64748b;
+            font-size: 12px;
+            margin-left: 12px;
+        }
+
+        .progress-container {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 28px;
+            border-radius: 10px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .download-link {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 20px;
+            background: var(--success);
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .download-link:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Arena 项目导出工具</h1>
+            <p>解析 Arena.ai Code 模式 JSON 并打包为 ZIP</p>
+			<p>形如 <u>https://arena.ai/api/evaluation/webdev/{uuid}</u></p>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <svg viewBox="0 0 24 24"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M12,12L16,16H13.5V19H10.5V16H8L12,12Z"/></svg>
+            <h3>拖拽 JSON 文件到此处</h3>
+            <p class="hint">或点击选择文件</p>
+            <input type="file" id="fileInput" accept=".json,application/json">
+        </div>
+
+        <div class="status-panel" id="statusPanel">
+            <div class="status-header">
+                <svg class="status-icon" id="statusIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                <span class="status-title" id="statusTitle">准备就绪</span>
+            </div>
+            <div class="status-details" id="statusDetails">等待上传文件...</div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
+        </div>
+
+        <div style="text-align: center;">
+            <button class="btn btn-primary" id="downloadBtn" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19,9h-4V3H9v6H5l7,7l7-7H19z M5,18v2h14v-2H5z"/></svg>
+                <span id="downloadBtnText">下载 ZIP</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const statusPanel = document.getElementById('statusPanel');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusDetails = document.getElementById('statusDetails');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadBtnText = document.getElementById('downloadBtnText');
+
+        let currentBlob = null;
+        let currentFileName = 'project.zip';
+
+        function showStatus(type, title, details) {
+            statusPanel.className = `status-panel show ${type}`;
+            statusTitle.textContent = title;
+            statusDetails.innerHTML = details;
+            
+            if (type === 'loading') {
+                document.getElementById('statusIcon').innerHTML = '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="31.4" stroke-dashoffset="10"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle>';
+                progressContainer.style.display = 'block';
+            } else if (type === 'success') {
+                document.getElementById('statusIcon').innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
+                progressContainer.style.display = 'none';
+            } else if (type === 'error') {
+                document.getElementById('statusIcon').innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>';
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        function updateProgress(percent, text) {
+            progressFill.style.width = `${percent}%`;
+            progressText.textContent = text;
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                processFile(e.target.files[0]);
+            }
+        });
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function processFile(file) {
+            if (!file.name.endsWith('.json')) {
+                showStatus('error', '文件格式错误', '请上传 .json 格式的文件');
+                return;
+            }
+
+            showStatus('loading', '正在解析 JSON...', '读取文件内容...');
+            downloadBtn.disabled = true;
+
+            try {
+                const text = await file.text();
+                const json = JSON.parse(text);
+                
+                if (!json.manifest || !json.manifest.files) {
+                    throw new Error('无效的 Arena JSON 格式：缺少 manifest.files 字段');
+                }
+
+                const zip = new JSZip();
+                const files = json.manifest.files;
+                const binaryFiles = json.manifest.binaryFiles || [];
+                const totalFiles = files.length + binaryFiles.length;
+                let processed = 0;
+
+                // 处理文本文件
+                for (const fileItem of files) {
+                    const cleanPath = fileItem.path.trim();
+                    if (!cleanPath) continue;
+                    
+                    zip.file(cleanPath, fileItem.content);
+                    processed++;
+                    updateProgress(Math.round((processed / totalFiles) * 100), `正在处理: ${cleanPath}`);
+                }
+
+                // 处理二进制文件
+                for (const binFile of binaryFiles) {
+                    const cleanPath = binFile.path.trim();
+                    if (!cleanPath) continue;
+                    
+                    try {
+                        const byteString = atob(binFile.content);
+                        const bytes = new Uint8Array(byteString.length);
+                        for (let i = 0; i < byteString.length; i++) {
+                            bytes[i] = byteString.charCodeAt(i);
+                        }
+                        zip.file(cleanPath, bytes);
+                    } catch (err) {
+                        console.warn(`跳过无效的二进制文件: ${cleanPath}`, err);
+                    }
+                    processed++;
+                    updateProgress(Math.round((processed / totalFiles) * 100), `正在处理: ${cleanPath}`);
+                }
+
+                showStatus('loading', '正在生成 ZIP 文件...', '打包所有文件...');
+                updateProgress(95, '生成中...');
+
+                const zipBlob = await zip.generateAsync({ 
+                    type: 'blob',
+                    compression: 'DEFLATE',
+                    compressionOptions: { level: 6 }
+                });
+
+                updateProgress(100, '完成!');
+                
+                currentBlob = zipBlob;
+                const baseName = json.metadata?.name || file.name.replace(/\.json$/, '');
+                currentFileName = `${baseName}-project.zip`;
+
+                const fileListHtml = files.map(f => `
+                    <div class="file-item">
+                        <span>${f.path.trim()}</span>
+                        <span class="file-size">${formatBytes(new Blob([f.content]).size)}</span>
+                    </div>
+                `).join('');
+
+                showStatus('success', '解析成功', `
+                    共提取 ${totalFiles} 个文件<br>
+                    总大小: ${formatBytes(zipBlob.size)}
+                    <div class="file-list">${fileListHtml}</div>
+                `);
+
+                downloadBtn.disabled = false;
+                downloadBtnText.textContent = `下载 ZIP (${formatBytes(zipBlob.size)})`;
+                downloadBtn.onclick = downloadZip;
+
+            } catch (err) {
+                showStatus('error', '处理失败', `
+                    ${err.message}<br>
+                    <span style="font-size: 12px; color: #64748b;">${err.stack.split('\n')[0]}</span>
+                `);
+                downloadBtn.disabled = true;
+            }
+        }
+
+        function downloadZip() {
+            if (!currentBlob) return;
+            
+            try {
+                const url = URL.createObjectURL(currentBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentFileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showStatus('success', '下载已开始', '如果浏览器未自动下载，请检查下载设置');
+            } catch (err) {
+                showStatus('error', '下载失败', err.message);
+            }
+        }
+    </script>
+</body>
+</html>
+

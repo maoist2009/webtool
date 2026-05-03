@@ -2,239 +2,101 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>网络工具箱</title>
-        <meta
-            name="description"
-            content="一系列网络工具箱"
-        />
-        <meta name="keywords" content="tool,web,censor,china,gfw" />
-
-        <!-- web app -->
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-            name="apple-mobile-web-app-status-bar-style"
-            content="black-translucent"
-        />
-
-        <!-- theme color-->
-        <meta
-            name="theme-color"
-            content="#e87c93"
-            media="(prefers-color-scheme: light)"
-        />
-        <meta
-            name="theme-color"
-            content="#e87c93"
-            media="(prefers-color-scheme: dark)"
-        />
-
-        <!-- fav icon -->
-        <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
-
-        <!-- apple-touch-icon -->
-        <link rel="/favicon.svg" type="image/svg+xml" />
-
-        <title>bilibili</title>
-
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
-        />
-    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="一套高效、安全、易用的在线网络工具集" />
+    <meta name="keywords" content="tool,web,censor,china,gfw" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#e87c93" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#e87c93" media="(prefers-color-scheme: dark)" />
+    <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <style>
-        /* === 主页特定样式 === */
-        .hero {
-            text-align: center;
-            padding: 40px 20px;
-            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
-            color: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            margin-bottom: 40px;
-        }
-
-        .hero h1 {
-            font-size: 2.8rem;
-            margin-bottom: 15px;
-        }
-
-        .hero p {
-            font-size: 1.3rem;
-            opacity: 0.9;
-            max-width: 700px;
-            margin: 0 auto 25px;
-        }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
-            margin-top: 20px;
-        }
-
-        .tool-card {
-            background: var(--panel-background);
-            border-radius: var(--border-radius);
-            padding: 25px;
-            box-shadow: var(--box-shadow);
-            transition: var(--transition);
-            border: 1px solid var(--border-color);
-            text-decoration: none;
-            color: var(--text-color);
-            display: block;
-        }
-
-        .tool-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-            border-color: var(--primary-color);
-        }
-
-        .tool-card h3 {
-            color: var(--primary-color);
-            margin-top: 0;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-
-        .tool-card h3 i {
-            margin-right: 10px;
-            font-size: 1.5rem;
-        }
-
-        .tool-card p {
-            color: var(--secondary-color);
-            margin-bottom: 20px;
-            flex-grow: 1;
-        }
-
-        .tool-card .btn {
-            display: inline-block;
-            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: var(--transition);
-        }
-
-        .tool-card .btn:hover {
-            transform: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            background: linear-gradient(135deg, var(--primary-hover) 0%, #6a4190 100%);
-        }
-
-        .features {
-            margin-top: 50px;
-            text-align: center;
-        }
-
-        .features h2 {
-            color: var(--heading-color);
-            margin-bottom: 30px;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-        }
-
-        .feature-item {
-            background: var(--panel-background);
-            padding: 20px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .feature-item h4 {
-            color: var(--primary-color);
-            margin-top: 0;
-        }
-    </style>
+/* 基础变量 */
+:root {
+  --primary:#764ba2;
+  --primary-light:#a78fd6;
+  --bg:#f9fafb;
+  --text:#333;
+  --radius:8px;
+  --transition:.3s;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);}
+/* 导航栏 */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0.8rem 1rem;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.05);}
+.nav-brand{font-weight:bold;font-size:1.2rem;}
+.nav-toggle-label{display:none;cursor:pointer;}
+.nav-toggle-label span,.nav-toggle-label span::before,.nav-toggle-label span::after{display:block;background:#333;height:2px;width:24px;border-radius:2px;position:relative;transition:var(--transition);}
+.nav-toggle-label span::before,.nav-toggle-label span::after{content:'';position:absolute;left:0;}
+.nav-toggle-label span::before{top:-6px;}
+.nav-toggle-label span::after{top:6px;}
+.nav-menu{display:flex;gap:1rem;list-style:none;}
+.nav-menu a{color:var(--text);text-decoration:none;padding:0.4rem;}
+@media (max-width:768px){
+  .nav-menu{position:fixed;top:0;left:-250px;width:250px;height:100%;background:#fff;flex-direction:column;padding-top:4rem;transition:left var(--transition);}
+  #nav-toggle:checked + .nav-toggle-label + .nav-menu{left:0;}
+  .nav-toggle-label{display:block;}
+}
+/* Hero 区 */
+.hero{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;padding:3rem 1rem;text-align:center;}
+.hero h1{font-size:2.4rem;}
+.hero p{font-size:1.1rem;opacity:0.9;max-width:700px;margin:auto;}
+/* Section 标题 */
+.section-title{font-size:1.8rem;color:var(--primary);margin:1.5rem 0 1rem;text-align:left;}
+/* 卡片网格 */
+.tools-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5rem;}
+.tool-card{background:#fff;border-radius:var(--radius);padding:1.2rem;box-shadow:0 2px 6px rgba(0,0,0,.08);text-decoration:none;color:var(--text);display:block;transition:transform var(--transition);}
+.tool-card:hover{transform:translateY(-4px);}
+.tool-card h3{color:var(--primary);margin:0 0 .5rem;display:flex;align-items:center;}
+.tool-card h3 i{margin-right:0.5rem;font-size:1.2rem;}
+.tool-card p{margin-bottom:0.8rem;color:#555;}
+.btn{display:inline-block;background:var(--primary);color:#fff;padding:0.4rem 0.8rem;border-radius:4px;font-weight:600;font-size:0.9rem;transition:background var(--transition);text-decoration:none;}
+.btn:hover{background:var(--primary-light);}
+/* Features 区 */
+.features{margin:3rem 0;text-align:center;}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;}
+.feature-item{background:#fff;padding:1rem;border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.feature-item h4{color:var(--primary);margin-bottom:0.5rem;}
+</style>
 </head>
 <body>
     <header class="hero">
-        <h1>网络工具箱</h1>
-        <p>一套高效、安全、易用的在线网络工具集</p>
+        <h1>浏览器本地工具箱</h1>
+        <p>一套高效、安全、易用的工具集</p>
     </header>
-
     <div class="container">
-        <h2 style="text-align: center; color: var(--heading-color); margin-bottom: 30px;">核心工具</h2>
-        
+        <h2 style="text-align:center;color:var(--heading-color);margin-bottom:20px;">网络工具</h2>
         <div class="tools-grid">
-            <a href="DoH.html" class="tool-card">
-                <h3><i>🔍</i> DNS over HTTPS 查询</h3>
-                <p>通过加密的 HTTPS 协议安全地查询 DNS 记录，保护您的隐私。</p>
-                <span class="btn">立即使用</span>
-            </a>
-            
-            <a href="CIDRmerge.html" class="tool-card">
-                <h3><i>🌐</i> IP CIDR 合并</h3>
-                <p>高效合并重叠或相邻的 IPv4/IPv6 CIDR 地址段。</p>
-                <span class="btn">立即使用</span>
-            </a>
-			
-			<a href="IPgenerate.html" class="tool-card">
-                <h3><i>🏭</i> IP 生成</h3>
-                <p>快速灵活根据规律生成IP</p>
-                <span class="btn">立即使用</span>
-            </a>
-
-            <a href="reveal.html" class="tool-card">
-                <h3><i>📽️</i> Reveal.js 编辑器</h3>
-                <p>在线创建幻灯片</p>
-                <span class="btn">立即使用</span>
-            </a>
-			
-			<a href="PDFsecure.html" class="tool-card">
-                <h3><i>🔒️</i> PDF安全保护</h3>
-                <p>PDF ToUnicode 码表置乱工具</p>
-                <span class="btn">立即使用</span>
-            </a>
-			
-			<a href="OCGfakePDF.html" class="tool-card">
-                <h3><i>🎭️</i> PDF伪装</h3>
-                <p>实验性的基于OCG的PDF伪装技术，用于打印店打印敏感内容 </p>
-                <span class="btn">立即使用</span>
-            </a>
-            
-			<a href="ApkEditor.html" class="tool-card">
-                <h3><i>️✏️</i>APK编辑器</h3>
-                <p>用于修改包名以躲避检测的APK编辑器</p>
-                <span class="btn">立即使用</span>
-            </a>
+            <!-- Core tools already listed -->
+            <a href="DoH.html" class="tool-card"><h3><i>🔍</i> DNS over HTTPS 查询</h3><p>通过加密的 HTTPS 协议安全地查询 DNS 记录，保护您的隐私。</p><span class="btn">立即使用</span></a>
+            <a href="CIDRmerge.html" class="tool-card"><h3><i>🌐</i> IP CIDR 合并</h3><p>高效合并重叠或相邻的 IPv4/IPv6 CIDR 地址段。</p><span class="btn">立即使用</span></a>
+            <a href="IPgenerate.html" class="tool-card"><h3><i>🏭</i> IP 生成</h3><p>快速灵活根据规律生成IP</p><span class="btn">立即使用</span></a>
         </div>
-
+        <h2 style="text-align:center;color:var(--heading-color);margin-bottom:20px;">PDF 工具</h2>
+        <div class="tools-grid">
+            <a href="PDFsecure.html" class="tool-card"><h3><i>🔒️</i> PDF安全保护</h3><p>PDF ToUnicode 码表置乱工具</p><span class="btn">立即使用</span></a>
+            <a href="OCGfakePDF.html" class="tool-card"><h3><i>🎭️</i> PDF伪装</h3><p>实验性的基于OCG的PDF伪装技术，用于打印店打印敏感内容 </p><span class="btn">立即使用</span></a>
+            <a href="PDFarranger.html" class="tool-card"><h3>📄 PDF 排版</h3><p>快速整理 PDF 页面顺序</p><span class="btn">立即使用</span></a>
+            <a href="Image2PDF.html" class="tool-card"><h3>🖼️ 图片转 PDF</h3><p>将图片合并为 PDF 文档</p><span class="btn">立即使用</span></a>
+        </div>
+        <h2 style="text-align:center;color:var(--heading-color);margin-bottom:20px;">杂项工具</h2>
+        <div class="tools-grid">
+            <a href="ArenaCodeExporter.html" class="tool-card"><h3>⚙️ 代码导出</h3><p>导出Arena json为zip</p><span class="btn">立即使用</span></a>
+			<a href="reveal.html" class="tool-card"><h3><i>📽️</i> Reveal.js 编辑器</h3><p>在线创建幻灯片</p><span class="btn">立即使用</span></a>
+            <a href="ApkEditor.html" class="tool-card"><h3><i>️✏️</i>APK编辑器</h3><p>用于修改包名以躲避检测的APK编辑器</p><span class="btn">立即使用</span></a>
+        </div>
         <div class="features">
             <h2>为什么选择我们的工具箱？</h2>
             <div class="features-grid">
-                <div class="feature-item">
-                    <h4>🔒 安全可靠</h4>
-                    <p>所有计算均在浏览器本地完成，数据无需上传服务器。</p>
-                </div>
-                <div class="feature-item">
-                    <h4>⚡ 快速高效</h4>
-                    <p>采用优化算法，即使是大量数据也能秒速处理。</p>
-                </div>
-                <div class="feature-item">
-                    <h4>🎨 简洁美观</h4>
-                    <p>现代化 UI 设计，提供愉悦的用户体验。</p>
-                </div>
-                <div class="feature-item">
-                    <h4>📱 响应式</h4>
-                    <p>完美适配桌面、平板和手机等各种设备。</p>
-                </div>
+                <div class="feature-item"><h4>🔒 安全可靠</h4><p>所有计算均在浏览器本地完成，数据无需上传服务器。</p></div>
+                <div class="feature-item"><h4>⚡ 快速高效</h4><p>采用优化算法，即使是大量数据也能秒速处理。</p></div>
+                <div class="feature-item"><h4>🎨 简洁美观</h4><p>现代化 UI 设计，提供愉悦的用户体验。</p></div>
+                <div class="feature-item"><h4>📱 响应式</h4><p>完美适配桌面、平板和手机等各种设备。</p></div>
             </div>
         </div>
     </div>
-
-    <footer>
-        <p>网络工具箱 | 所有工具均为本地处理，保障您的数据安全</p>
-    </footer>
+    <footer><p>网络工具箱 | 所有工具均为本地处理，保障您的数据安全</p></footer>
 </body>
 </html>
