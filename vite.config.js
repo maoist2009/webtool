@@ -6,12 +6,13 @@ export default defineConfig({
     base: '/',
     plugins: [
         VitePWA({
-            injectRegister: 'auto',
-            registerType: 'autoUpdate',
-            devOptions: {
-                enabled: true
-            },
+            // 预缓存所有构建产物（HTML、CSS、JS、图片等）
+            // globPatterns 会在 build 时自动把匹配的文件加入 precache 列表
+            // 这样离线时即使没有网络也能直接从缓存读取这些核心资源
+            // 这里使用通配符匹配常见的静态资源类型
             workbox: {
+                // 预缓存所有构建产物（HTML、JS、CSS、图片等）
+                globPatterns: ['**/*.{html,js,css,svg,png,ico,webp}'],
                 // 配置路由策略，避免将HTML文件重定向到index.html
                 navigateFallback: null, // 不使用fallback，保持原始路由
                 skipWaiting: true,
