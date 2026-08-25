@@ -330,6 +330,21 @@
         let currentBlob = null;
         let currentFileName = 'project.zip';
 
+        const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+        // 归一化 ZIP 内路径：拒绝 ../ 与绝对路径，防止解压时目录逃逸
+        function sanitizeZipPath(p) {
+            const segs = String(p).trim().replace(/\\/g, '/').split('/');
+            const out = [];
+            for (const seg of segs) {
+                if (!seg || seg === '.' || /^[a-zA-Z]:$/.test(seg)) continue;
+                if (seg === '..') throw new Error(`路径不安全: ${p}`);
+                out.push(seg);
+            }
+            if (!out.length) throw new Error(`路径无效: ${p}`);
+            return out.join('/');
+        }
+
         function showStatus(type, title, details) {
             statusPanel.className = `status-panel show ${type}`;
             statusTitle.textContent = title;
@@ -411,19 +426,16 @@
 
                 // 处理文本文件
                 for (const fileItem of files) {
-                    const cleanPath = fileItem.path.trim();
-                    if (!cleanPath) continue;
-                    
+                    const cleanPath = sanitizeZipPath(fileItem.path);
                     zip.file(cleanPath, fileItem.content);
                     processed++;
-                    updateProgress(Math.round((processed / totalFiles) * 100), `正在处理: ${cleanPath}`);
+                    updateProgress(totalFiles ? Math.round((processed / totalFiles) * 100) : 100, `正在处理: ${cleanPath}`);
                 }
 
                 // 处理二进制文件
                 for (const binFile of binaryFiles) {
-                    const cleanPath = binFile.path.trim();
-                    if (!cleanPath) continue;
-                    
+                    const cleanPath = sanitizeZipPath(binFile.path);
+
                     try {
                         const byteString = atob(binFile.content);
                         const bytes = new Uint8Array(byteString.length);
@@ -435,7 +447,7 @@
                         console.warn(`跳过无效的二进制文件: ${cleanPath}`, err);
                     }
                     processed++;
-                    updateProgress(Math.round((processed / totalFiles) * 100), `正在处理: ${cleanPath}`);
+                    updateProgress(totalFiles ? Math.round((processed / totalFiles) * 100) : 100, `正在处理: ${cleanPath}`);
                 }
 
                 showStatus('loading', '正在生成 ZIP 文件...', '打包所有文件...');
@@ -455,7 +467,7 @@
 
                 const fileListHtml = files.map(f => `
                     <div class="file-item">
-                        <span>${f.path.trim()}</span>
+                        <span>${escapeHtml(f.path.trim())}</span>
                         <span class="file-size">${formatBytes(new Blob([f.content]).size)}</span>
                     </div>
                 `).join('');
@@ -472,8 +484,8 @@
 
             } catch (err) {
                 showStatus('error', '处理失败', `
-                    ${err.message}<br>
-                    <span style="font-size: 12px; color: #64748b;">${err.stack.split('\n')[0]}</span>
+                    ${escapeHtml(err.message)}<br>
+                    <span style="font-size: 12px; color: #64748b;">${escapeHtml((err.stack || '').split('\n')[0])}</span>
                 `);
                 downloadBtn.disabled = true;
             }

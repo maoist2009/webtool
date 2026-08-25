@@ -417,24 +417,43 @@
                         mergedDoc.catalog.set(PDFName.of('OCProperties'), ocProperties);
 
                         this.status = this.t().statusOverlay(pageCount);
+                        if (pageCount < 1) throw new Error(this.t().errorNoPages || '源 PDF 没有页面');
                         const realPages = await mergedDoc.embedPages(realPdfDoc.getPages());
                         const fakePages = await mergedDoc.embedPages(fakePdfDoc.getPages());
+                        if (!fakePages.length) throw new Error(this.t().errorNoFakePages || '伪装 PDF 没有页面');
 
                         const bdcFake = PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [PDFName.of('OC'), PDFName.of('ocFake')]);
                         const bdcReal = PDFOperator.of(PDFOperatorNames.BeginMarkedContentSequence, [PDFName.of('OC'), PDFName.of('ocReal')]);
                         const emc = PDFOperator.of(PDFOperatorNames.EndMarkedContent, []);
 
                         for (let i = 0; i < pageCount; i++) {
-                            const page = mergedDoc.addPage([width, height]);
+                            // 逐页取源页尺寸与 /Rotate：embedPages 不携带旋转，混合尺寸/横向扫描件需自行补偿
+                            const srcPage = realPdfDoc.getPage(i);
+                            const { width: sw, height: sh } = srcPage.getSize();
+                            const rot = ((srcPage.getRotation().angle % 360) + 360) % 360;
+                            const swap = rot === 90 || rot === 270;
+                            const tw = swap ? sh : sw, th = swap ? sw : sh;
+                            const page = mergedDoc.addPage([tw, th]);
                             const realEmbedded = realPages[i];
                             const fakeEmbedded = fakePages[i % fakePages.length];
 
+                            // drawPage 绕锚点旋转，按角度把内容平移回页面范围内
+                            let ropts = {};
+                            if (rot === 90) ropts = { x: tw, y: 0, rotate: PDFLib.degrees(90) };
+                            else if (rot === 180) ropts = { x: tw, y: th, rotate: PDFLib.degrees(180) };
+                            else if (rot === 270) ropts = { x: 0, y: th, rotate: PDFLib.degrees(270) };
+
+                            // 伪装层缩放铺满目标页（cover），旋转时用视觉尺寸反推比例
+                            const fw = fakeEmbedded.width, fh = fakeEmbedded.height;
+                            const coverScale = swap ? Math.max(tw / fh, th / fw) : Math.max(tw / fw, th / fh);
+                            const fopts = { xScale: coverScale, yScale: coverScale, ...ropts };
+
                             page.pushOperators(bdcReal);
-                            page.drawPage(realEmbedded);
+                            page.drawPage(realEmbedded, ropts);
                             page.pushOperators(emc);
 
                             page.pushOperators(bdcFake);
-                            page.drawPage(fakeEmbedded);
+                            page.drawPage(fakeEmbedded, fopts);
                             page.pushOperators(emc);
 
                             let resources = page.node.get(PDFName.of('Resources'));

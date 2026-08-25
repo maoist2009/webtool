@@ -402,31 +402,42 @@ function handleFiles(files) {
 
   let processed = 0;
   const total = imageFiles.length;
+  // 预占位固定下标：FileReader 完成顺序不确定，直接 push 会打乱页序
+  const baseIndex = images.length;
+  for (let k = 0; k < total; k++) images.push(null);
+
+  const finalize = () => {
+    processed++;
+    if (processed !== total) return;
+    images = images.filter(Boolean);
+    renderImageList();
+    if (images.length > baseIndex) openCropModal(baseIndex);
+  };
 
   imageFiles.forEach((file, idx) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        images.push({
+        images[baseIndex + idx] = {
           id: Date.now() + '_' + idx + '_' + Math.random().toString(36).substr(2, 9),
           name: file.name,
           width: img.width,
           height: img.height,
           dataUrl: e.target.result,
           croppedDataUrl: null
-        });
-        processed++;
-        renderImageList();
-        if (processed === total) openCropModal(images.length - 1);
+        };
+        finalize();
       };
-      img.onerror = () => { processed++; showToast(`${file.name} 无法加载`, 'error'); };
+      img.onerror = () => { showToast(`${file.name} 无法加载`, 'error'); finalize(); };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   });
   showToast(`已添加 ${imageFiles.length} 张图片`, 'success');
 }
+
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function renderImageList() {
   imageCount.textContent = images.length;
@@ -443,7 +454,7 @@ function renderImageList() {
     html += `<div class="image-item" draggable="true" data-index="${idx}" ondragstart="onDragStart(event,${idx})" ondragover="onDragOver(event,${idx})" ondragleave="onDragLeave(event)" ondrop="onDrop(event,${idx})" ondragend="onDragEnd(event)">
       <div class="image-index">${idx+1}</div>
       <img class="image-thumb" src="${url}" alt="">
-      <div class="image-info"><div class="image-name">${img.name}${badge}</div><div class="image-dimensions">${img.width} × ${img.height}px</div></div>
+      <div class="image-info"><div class="image-name">${escapeHtml(img.name)}${badge}</div><div class="image-dimensions">${img.width} × ${img.height}px</div></div>
       <div class="image-actions"><button class="btn btn-secondary" onclick="reCrop(${idx})">裁剪</button><button class="btn btn-danger" onclick="removeImage(${idx})">删除</button></div>
     </div>`;
   });
@@ -791,8 +802,9 @@ function customFit() {
   if (!e.image) return;
   e.scale = Math.min(e.containerWidth / e.imgWidth, e.containerHeight / e.imgHeight) * 0.85;
   const bounds = getScreenBounds();
-  e.offsetX = (e.containerWidth * e.dpr - bounds.w * e.dpr) / 2;
-  e.offsetY = (e.containerHeight * e.dpr - bounds.h * e.dpr) / 2;
+  // 减去包围盒左上角偏移，旋转后内容为负坐标时也能正确居中
+  e.offsetX = (e.containerWidth * e.dpr - bounds.w * e.dpr) / 2 - bounds.minX * e.dpr;
+  e.offsetY = (e.containerHeight * e.dpr - bounds.h * e.dpr) / 2 - bounds.minY * e.dpr;
   render();
 }
 
@@ -896,12 +908,15 @@ function applyCustomCrop() {
   if (e.rotation === 0) {
     outCtx.drawImage(e.image, -e.cropX, -e.cropY);
   } else {
-    // 旋转处理
+    // 旋转处理：90°/270° 时旋转后包围盒宽高互换，画布尺寸必须跟着换，否则四角被裁掉
+    const swap = (e.rotation === 90 || e.rotation === 270);
+    const tw = swap ? e.imgHeight : e.imgWidth;
+    const th = swap ? e.imgWidth : e.imgHeight;
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = e.imgWidth;
-    tempCanvas.height = e.imgHeight;
-    tempCtx.translate(e.imgWidth / 2, e.imgHeight / 2);
+    tempCanvas.width = tw;
+    tempCanvas.height = th;
+    tempCtx.translate(tw / 2, th / 2);
     tempCtx.rotate(e.rotation * Math.PI / 180);
     tempCtx.drawImage(e.image, -e.imgWidth / 2, -e.imgHeight / 2);
     outCtx.drawImage(tempCanvas, -e.cropX, -e.cropY);

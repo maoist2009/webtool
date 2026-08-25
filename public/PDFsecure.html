@@ -367,16 +367,20 @@ begincmap
 1 begincodespacerange
 <00> <FF>
 endcodespacerange
-256 beginbfchar
 `;
-            for (let i = 0; i < 256; i++) {
-                const cid = i.toString(16).padStart(2, '0').toUpperCase();
-                const uni = unis[i].toString(16).padStart(4, '0').toUpperCase();
-                cmap += `<${cid}> <${uni}>\n`;
+            // PDF 规范限制每个 bfchar 块最多 100 条映射，分块输出（100+100+56）
+            for (let start = 0; start < 256; start += 100) {
+                const end = Math.min(start + 100, 256);
+                cmap += `${end - start} beginbfchar\n`;
+                for (let i = start; i < end; i++) {
+                    const cid = i.toString(16).padStart(2, '0').toUpperCase();
+                    const uni = unis[i].toString(16).padStart(4, '0').toUpperCase();
+                    cmap += `<${cid}> <${uni}>\n`;
+                }
+                cmap += `endbfchar\n`;
             }
-            
-            cmap += `endbfchar
-endcmap
+
+            cmap += `endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end
@@ -385,17 +389,17 @@ end
         }
 
         // 递归遍历字典查找 ToUnicode
-        function findAndScrambleToUnicode(obj, context, visited = new Set(), depth = 0, randomFunc) {
+        function findAndScrambleToUnicode(obj, context, visited = new Set(), depth = 0, randomFunc, ref = null) {
             if (depth > 50) return 0; // 防止无限递归
-            
+
             let count = 0;
-            
+
             if (!obj || typeof obj !== 'object') return count;
-            
-            // 避免循环引用
-            const objId = obj.toString?.() || String(obj);
-            if (visited.has(objId)) return count;
-            visited.add(objId);
+
+            // 避免循环引用：优先以引用对象本体为键，内联对象退回按实例去重，避免内容相同的字典互相误判
+            const visitKey = ref || obj;
+            if (visited.has(visitKey)) return count;
+            visited.add(visitKey);
             
             try {
                 // 检查是否是字体字典
@@ -440,7 +444,7 @@ end
                     for (const [key, value] of entries) {
                         if (value instanceof PDFRef) {
                             const resolved = context.lookup(value);
-                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1, randomFunc);
+                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1, randomFunc, value);
                         } else {
                             count += findAndScrambleToUnicode(value, context, visited, depth + 1, randomFunc);
                         }
@@ -454,7 +458,7 @@ end
                         const item = obj.get(i);
                         if (item instanceof PDFRef) {
                             const resolved = context.lookup(item);
-                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1, randomFunc);
+                            count += findAndScrambleToUnicode(resolved, context, visited, depth + 1, randomFunc, item);
                         } else {
                             count += findAndScrambleToUnicode(item, context, visited, depth + 1, randomFunc);
                         }
@@ -496,11 +500,16 @@ end
                 setProgress(10);
                 
                 const arrayBuffer = await selectedFile.arrayBuffer();
-                const pdfDoc = await PDFDocument.load(arrayBuffer, { 
+                const pdfDoc = await PDFDocument.load(arrayBuffer, {
                     ignoreEncryption: true,
-                    updateMetadata: false 
+                    updateMetadata: false
                 });
-                
+
+                // 加密PDF的流内容无法正确重写，直接终止处理
+                if (pdfDoc.isEncrypted) {
+                    throw new Error('不支持已加密的PDF文件');
+                }
+
                 log(`PDF加载成功，共 ${pdfDoc.getPageCount()} 页`);
                 setProgress(20);
                 
@@ -512,6 +521,26 @@ end
                     try {
                         const catalog = pdfDoc.catalog;
                         if (catalog.has(PDFName.of('Outlines'))) {
+                            const outlinesRef = catalog.get(PDFName.of('Outlines'));
+                            // 沿 Outline 树逐个删除节点引用，避免 save 时孤立书签对象仍被写出
+                            const deletedRefs = new Set();
+                            const deleteOutlineNode = (ref) => {
+                                if (!(ref instanceof PDFRef) || deletedRefs.has(ref)) return;
+                                deletedRefs.add(ref);
+                                try {
+                                    const node = context.lookup(ref);
+                                    if (node instanceof PDFDict) {
+                                        for (const linkKey of ['First', 'Last', 'Next', 'Prev']) {
+                                            const linked = node.get(PDFName.of(linkKey));
+                                            if (linked) deleteOutlineNode(linked);
+                                        }
+                                    }
+                                } catch (e) {
+                                    // 忽略单个节点解析错误
+                                }
+                                context.delete(ref);
+                            };
+                            deleteOutlineNode(outlinesRef);
                             catalog.delete(PDFName.of('Outlines'));
                             log('书签已删除', 'success');
                         } else {
@@ -533,6 +562,11 @@ end
                         pdfDoc.setKeywords([]);
                         pdfDoc.setProducer('');
                         pdfDoc.setCreator('');
+                        // 同时删除 Catalog 的 XMP 元数据流
+                        const catalog = pdfDoc.catalog;
+                        if (catalog.has(PDFName.of('Metadata'))) {
+                            catalog.delete(PDFName.of('Metadata'));
+                        }
                         log('元数据已清除', 'success');
                     } catch (e) {
                         log('清除元数据时出错: ' + e.message, 'warning');

@@ -433,6 +433,8 @@
   <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/xml/xml.min.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/codemirror@5.65.16/mode/javascript/javascript.min.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <!-- DOMPurify：所有 marked 输出必须经其消毒后再写入 innerHTML -->
+  <script src="https://gcore.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/notes/notes.js"></script>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"></script>
@@ -448,6 +450,8 @@
       const toastEl = $('#toast');
 
       function toast(msg) { toastEl.textContent = msg; toastEl.style.display = 'block'; clearTimeout(toastEl.__t); toastEl.__t = setTimeout(() => (toastEl.style.display = 'none'), 2000); }
+      // HTML 实体转义，用于拼进导出窗口模板的不可信字符串（文件名等）
+      function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
       function debounce(fn, wait) { let t = null; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
       function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
 
@@ -538,7 +542,9 @@
             div.className = 'file-tree-item' + (item.type === 'folder' ? ' folder' : '') + (isActive ? ' active' : '') + (isSelected && !isActive ? ' selected' : ''); 
             div.dataset.id = id; 
             const isExpanded = workspace.expandedFolders.includes(id); 
-            div.innerHTML = `<span class="icon">${item.type === 'folder' ? (isExpanded ? '📂' : '📁') : '📄'}</span><span class="name">${item.name}</span><span class="actions"><button data-action="rename" title="重命名">✏️</button><button data-action="delete" title="删除">🗑️</button></span>`; 
+            div.innerHTML = `<span class="icon">${item.type === 'folder' ? (isExpanded ? '📂' : '📁') : '📄'}</span><span class="name"></span><span class="actions"><button data-action="rename" title="重命名">✏️</button><button data-action="delete" title="删除">🗑️</button></span>`;
+            // 文件名可能来自导入的工作区，必须用 textContent 注入防 XSS
+            div.querySelector('.name').textContent = item.name; 
             div.addEventListener('click', (e) => { 
               if (e.target.dataset.action) return; 
               workspace.selectedItemId = id;
@@ -583,7 +589,27 @@
       $('#renameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#renameConfirm').click(); else if (e.key === 'Escape') closeRenameModal(); });
 
       function exportWorkspace() { const data = { version: 3, exportDate: new Date().toISOString(), workspace, settings }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `reveal-workspace-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast('已导出工作区'); }
-      function importWorkspace(file) { const reader = new FileReader(); reader.onload = () => { try { const data = JSON.parse(reader.result); if (!data.workspace || !data.workspace.files) throw new Error('Invalid'); workspace.activeFileId = null; workspace = data.workspace; if (data.settings) { settings = { ...settings, ...data.settings }; applySettings(); } saveWorkspace(); renderFileTree(); let targetFileId = workspace.activeFileId; if (!targetFileId || !workspace.files[targetFileId]) { const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file'); targetFileId = files.length > 0 ? files[0][0] : null; } if (targetFileId && workspace.files[targetFileId]) { workspace.activeFileId = targetFileId; const file = workspace.files[targetFileId]; cm.setValue(file.content || ''); $('#currentFileName').textContent = file.name; setDirty(false); saveWorkspace(); renderFileTree(); requestPreviewUpdate(); } else { cm.setValue(''); $('#currentFileName').textContent = ''; } toast('已导入工作区'); } catch (e) { toast('导入失败'); } }; reader.readAsText(file); }
+      // 校验导入的文件树：type 合法、parentId 必须存在且父链无环，防止恶意 JSON 导致渲染死循环
+      function validateFiles(files) {
+        for (const id of Object.keys(files)) {
+          const node = files[id];
+          if (!node || typeof node !== 'object' || (node.type !== 'file' && node.type !== 'folder')) return false;
+          const pid = node.parentId;
+          if (pid !== null && (typeof pid !== 'string' || !Object.prototype.hasOwnProperty.call(files, pid))) return false;
+          // 沿父链上溯，visited 集合防环
+          const visited = new Set([id]);
+          let cur = pid;
+          while (cur !== null) {
+            if (visited.has(cur)) return false;
+            visited.add(cur);
+            const p = files[cur] && files[cur].parentId;
+            if (p === undefined) return false;
+            cur = p;
+          }
+        }
+        return true;
+      }
+      function importWorkspace(file) { const reader = new FileReader(); reader.onload = () => { try { const data = JSON.parse(reader.result); if (!data.workspace || !data.workspace.files || !validateFiles(data.workspace.files)) throw new Error('Invalid'); workspace.activeFileId = null; workspace = data.workspace; if (data.settings) { settings = { ...settings, ...data.settings }; applySettings(); } saveWorkspace(); renderFileTree(); let targetFileId = workspace.activeFileId; if (!targetFileId || !workspace.files[targetFileId]) { const files = Object.entries(workspace.files).filter(([_, f]) => f.type === 'file'); targetFileId = files.length > 0 ? files[0][0] : null; } if (targetFileId && workspace.files[targetFileId]) { workspace.activeFileId = targetFileId; const file = workspace.files[targetFileId]; cm.setValue(file.content || ''); $('#currentFileName').textContent = file.name; setDirty(false); saveWorkspace(); renderFileTree(); requestPreviewUpdate(); } else { cm.setValue(''); $('#currentFileName').textContent = ''; } toast('已导入工作区'); } catch (e) { toast('导入失败'); } }; reader.readAsText(file); }
 
       function updateToggleButtons() { $('#btnToggleLeft').classList.toggle('active', uiState.leftSidebarOpen); $('#btnToggleRight').classList.toggle('active', uiState.rightSidebarOpen); $('#btnToggleEditor').classList.toggle('active', uiState.editorVisible); $('#btnTogglePreview').classList.toggle('active', uiState.previewVisible); }
       function toggleLeftSidebar() { uiState.leftSidebarOpen = !uiState.leftSidebarOpen; $('#leftSidebar').classList.toggle('collapsed', !uiState.leftSidebarOpen); updateToggleButtons(); saveWorkspace(); setTimeout(() => { deck && deck.layout(); cm && cm.refresh(); }, 250); }
@@ -609,31 +635,39 @@
       $('#settingSyncSlide').addEventListener('change', (e) => { settings.syncSlide = e.target.checked; saveWorkspace(); });
       $('#settingOverflowWarn').addEventListener('change', (e) => { settings.overflowWarn = e.target.checked; saveWorkspace(); });
 
-      function splitSlides(md) { const normalized = String(md || '').replace(/\r\n/g, '\n'); const h = normalized.split(/\n\s*---\s*\n/g); return h.map(part => part.split(/\n\s*--\s*\n/g)); }
-      function renderSlideMarkdown(mdChunk) { const src = String(mdChunk || '').trim(); if (!src) return '<p style="opacity:0.5">（空白页）</p>'; return marked.parse(src); }
+      // 共享分页：逐行扫描并跳过 ``` 围栏内的分隔符，渲染/溢出检测/光标同步三处统一复用；
+      // 返回横向分组，每片含 content 与起始行号 startLine
+      function paginateSlides(md) {
+        const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+        const groups = [[{ content: '', startLine: 0 }]];
+        let inFence = false;
+        for (let i = 0; i < lines.length; i++) {
+          const raw = lines[i];
+          if (/^\s*(```|~~~)/.test(raw)) inFence = !inFence;
+          const t = raw.trim();
+          if (!inFence && i > 0 && t === '---') { groups.push([{ content: '', startLine: i + 1 }]); continue; }
+          if (!inFence && i > 0 && t === '--') { groups[groups.length - 1].push({ content: '', startLine: i + 1 }); continue; }
+          const parts = groups[groups.length - 1], part = parts[parts.length - 1];
+          part.content += (part.content ? '\n' : '') + raw;
+        }
+        return groups;
+      }
+      function splitSlides(md) { return paginateSlides(md).map(g => g.map(p => p.content)); }
+      function renderSlideMarkdown(mdChunk) { const src = String(mdChunk || '').trim(); if (!src) return '<p style="opacity:0.5">（空白页）</p>'; return window.DOMPurify ? DOMPurify.sanitize(marked.parse(src)) : ''; }
       function buildSlidesHtml(md) { const groups = splitSlides(md); let out = ''; for (const verticalGroup of groups) { if (verticalGroup.length > 1) { out += '<section>'; for (const v of verticalGroup) out += `<section>${renderSlideMarkdown(v)}</section>`; out += '</section>'; } else out += `<section>${renderSlideMarkdown(verticalGroup[0])}</section>`; } return out; }
       
-      // 根据光标位置计算当前幻灯片索引
+      // 根据光标位置计算当前幻灯片索引（复用共享分页，与渲染/溢出检测保持一致）
       function getSlideIndexFromCursor() {
         if (!cm) return { h: 0, v: 0 };
-        const cursor = cm.getCursor();
-        const content = cm.getValue();
-        const lines = content.split('\n');
-        
+        const line = cm.getCursor().line;
+        const groups = paginateSlides(cm.getValue());
         let h = 0, v = 0;
-        let currentLine = 0;
-        
-        for (let i = 0; i < lines.length && currentLine <= cursor.line; i++) {
-          const line = lines[i].trim();
-          if (line === '---' && i > 0) {
-            h++;
-            v = 0;
-          } else if (line === '--' && i > 0) {
-            v++;
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
+          for (let vi = 0; vi < g.length; vi++) {
+            if (g[vi].startLine <= line + 1) { h = gi; v = vi; }
           }
-          currentLine++;
         }
-        
         return { h, v };
       }
       
@@ -718,8 +752,8 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>${fname} - PDF 导出</title>
-  <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${theme}.css">
+  <title>${escapeHtml(fname)} - PDF 导出</title>
+  <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/${escapeHtml(theme)}.css">
   <link rel="stylesheet" href="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -746,7 +780,7 @@
   </style>
 </head>
 <body>
-  <div class="print-header"><h1>📄 ${fname}</h1><div class="info">共 <strong>${flatSlides.length}</strong> 页 · 打印设置：<strong>A4 横向</strong>、边距<strong>无</strong>、勾选<strong>背景图形</strong></div><div class="spacer"></div><button class="btn-print" onclick="window.print()">🖨️ 打印 / 保存 PDF</button><button class="btn-close" onclick="window.close()">✕ 关闭</button></div>
+  <div class="print-header"><h1>📄 ${escapeHtml(fname)}</h1><div class="info">共 <strong>${flatSlides.length}</strong> 页 · 打印设置：<strong>A4 横向</strong>、边距<strong>无</strong>、勾选<strong>背景图形</strong></div><div class="spacer"></div><button class="btn-print" onclick="window.print()">🖨️ 打印 / 保存 PDF</button><button class="btn-close" onclick="window.close()">✕ 关闭</button></div>
   <div class="slides-container">${slidePagesHtml}</div>
   <script src="https://gcore.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"><\/script>
   <script>if (typeof hljs !== 'undefined') { document.querySelectorAll('pre code').forEach(block => { hljs.highlightElement(block); }); }<\/script>
@@ -776,7 +810,8 @@
       
       function saveSnapshot() { annoState.snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height); }
       function restoreSnapshot() { if (annoState.snapshot) ctx.putImageData(annoState.snapshot, 0, 0); }
-      function saveToHistory() { annoState.history.push(ctx.getImageData(0, 0, canvas.width, canvas.height)); if (annoState.history.length > 50) annoState.history.shift(); }
+      // 每笔历史存整幅 ImageData，50 笔可达数百 MB，降到 12 控制内存
+      function saveToHistory() { annoState.history.push(ctx.getImageData(0, 0, canvas.width, canvas.height)); if (annoState.history.length > 12) annoState.history.shift(); }
       function undo() { if (annoState.history.length > 0) ctx.putImageData(annoState.history.pop(), 0, 0); }
       
       function drawArrow(x1, y1, x2, y2, color, width) { 
@@ -919,11 +954,11 @@
         const md = cm.getValue();
         const idx = getSlideIndexFromCursor();
         
-        // 分割获取当前幻灯片内容
-        const hSlides = md.split(/\n---\n/);
+        // 分割获取当前幻灯片内容（复用共享分页，与渲染一致）
+        const hSlides = splitSlides(md);
         if (idx.h >= hSlides.length) return;
-        
-        const vSlides = hSlides[idx.h].split(/\n--\n/);
+
+        const vSlides = hSlides[idx.h];
         if (idx.v >= vSlides.length) return;
         
         const slideContent = vSlides[idx.v] || '';

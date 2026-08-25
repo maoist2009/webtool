@@ -156,8 +156,11 @@
 
         // 将十六进制字符串转换为 Uint8Array
         function hexToUint8Array(hex) {
+            if (hex.length === 0 || hex.length % 2 !== 0) {
+                throw new Error("十六进制数据为空或长度为奇数");
+            }
             return new Uint8Array(
-                hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+                hex.match(/.{2}/g).map(byte => parseInt(byte, 16))
             );
         }
 
@@ -166,10 +169,14 @@
             return (data[offset] << 8) | data[offset + 1];
         }
 
-        // Base64 编码
+        // Base64 编码（输入为 0-255 字节序列，直接转二进制字符串，不做 UTF-8 重编码）
         function base64Encode(data) {
-            const binaryString = String.fromCharCode(...data);
-            return btoa(unescape(encodeURIComponent(binaryString)));
+            let binaryString = "";
+            const CHUNK_SIZE = 0x8000; // 分块转换，避免大输入展开参数导致栈溢出
+            for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+                binaryString += String.fromCharCode.apply(null, data.subarray(i, i + CHUNK_SIZE));
+            }
+            return btoa(binaryString);
         }
 
         // 解析 ALPN 值
@@ -283,20 +290,25 @@
                  return JSON.stringify({priority: priority, targetName: ".", params: {}}, null, 2);
             }
             
-            const targetNameLength = binaryData[offset];
-            offset += 1;
-            
-            if (offset + targetNameLength > binaryData.length) {
-                return "数据不足，无法读取目标名称";
+            // 按 DNS wire format 循环读取 label 序列（长度字节+内容），0x00 结束
+            const labels = [];
+            while (true) {
+                if (offset >= binaryData.length) {
+                    return "数据不足，无法读取目标名称";
+                }
+                const labelLength = binaryData[offset];
+                offset += 1;
+                if (labelLength === 0) {
+                    break; // 根标签，名称结束
+                }
+                if (offset + labelLength > binaryData.length) {
+                    return "数据不足，无法读取目标名称";
+                }
+                labels.push(decoder.decode(binaryData.slice(offset, offset + labelLength)));
+                offset += labelLength;
             }
-            
-            const targetName =
-                targetNameLength > 0
-                    ? decoder.decode(
-                          binaryData.slice(offset, offset + targetNameLength)
-                      )
-                    : ".";
-            offset += targetNameLength;
+
+            const targetName = labels.length > 0 ? labels.join(".") : ".";
 
             const params = parseParams(binaryData, offset, decoder);
 
@@ -307,6 +319,9 @@
             }, null, 2);
         }
 
+        // 当前进行中查询的 AbortController（用于超时与取消旧查询）
+        let activeQueryAbortController = null;
+
         // 执行DNS查询
         async function queryDnsOverHttps(domain, type = "A", dohServer = "https://cloudflare-dns.com/dns-query") {
             if (!domain || typeof domain !== "string") {
@@ -316,16 +331,26 @@
                 throw new Error("无效的记录类型");
             }
 
+            // 已有进行中的查询时先中止旧的，避免并发覆盖结果
+            if (activeQueryAbortController) {
+                activeQueryAbortController.abort();
+            }
+            const abortController = new AbortController();
+            activeQueryAbortController = abortController;
+            const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10 秒超时
+
             const encodedDomain = encodeURIComponent(domain);
             const cleanDohServer = dohServer.trim();
-            const url = `${cleanDohServer}?name=${encodedDomain}&type=${type}`;
+            // 用户填写的地址可能已含查询参数（含 ? 时用 & 拼接）
+            const url = `${cleanDohServer}${cleanDohServer.includes("?") ? "&" : "?"}name=${encodedDomain}&type=${type}`;
 
             try {
                 const response = await fetch(url, {
                     method: "GET",
                     headers: {
                         "Accept": "application/dns-json"
-                    }
+                    },
+                    signal: abortController.signal
                 });
 
                 if (!response.ok) {
@@ -354,8 +379,22 @@
 
                 return data;
             } catch (error) {
+                if (error.name === "AbortError") {
+                    if (activeQueryAbortController !== abortController) {
+                        // 本查询已被新发起的查询取代，静默结束，不覆盖新查询的界面状态
+                        const supersededErr = new Error("查询已被新的查询取代");
+                        supersededErr.superseded = true;
+                        throw supersededErr;
+                    }
+                    throw new Error("查询失败: 请求超时（10 秒），已中止");
+                }
                 console.error("查询DNS数据时出错:", error);
                 throw new Error(`查询失败: ${error.message}`);
+            } finally {
+                clearTimeout(timeoutId);
+                if (activeQueryAbortController === abortController) {
+                    activeQueryAbortController = null;
+                }
             }
         }
 
@@ -444,6 +483,7 @@
                 displayResult(resultElement, result);
                 showNotification('查询完成！');
             } catch (error) {
+                if (error.superseded) return; // 旧查询已被新查询取代，保持新查询的界面状态
                 resultElement.textContent = `错误: ${error.message}`;
                 showNotification(error.message, 'error');
             }

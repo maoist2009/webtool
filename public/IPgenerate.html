@@ -436,6 +436,7 @@
             let fullAddr = ip;
             if (ip.includes('::')) {
                 const parts = ip.split('::');
+                if (parts.length !== 2) throw new Error(`无效的 IPv6 地址: ${ip}`);
                 const leftParts = parts[0] ? parts[0].split(':') : [];
                 const rightParts = parts[1] ? parts[1].split(':') : [];
                 const missingParts = 8 - leftParts.length - rightParts.length;
@@ -534,29 +535,20 @@
 
             const maxCombinations = 1n << BigInt(variableBitCount);
 
+            // --- 性能优化：循环外预计算变量位下标，每轮仅对计数器取位组装地址 ---
+            const varBits = []; // 变量位的位置（从高位到低位），下标顺序与计数器位顺序一致
+            for (let j = 0; j < totalBits; j++) {
+                if ((mask & (1n << BigInt(totalBits - 1 - j))) === 0n) {
+                    varBits.push(BigInt(totalBits - 1 - j));
+                }
+            }
+
             for (let i = 0n; i < maxCombinations; i++) {
                 let addr = fixedBits;
-                let shift = 0n;
-                for (let j = 0; j < totalBits; j++) {
-                    if ((mask & (1n << BigInt(totalBits - 1 - j))) === 0n) {
-                        // This bit is variable ('x')
-                        const bitValue = (i >> shift) & 1n;
-                        addr |= (bitValue << BigInt(totalBits - 1 - j));
-                        shift++;
-                    }
+                for (let k = 0; k < varBits.length; k++) {
+                    addr |= ((i >> BigInt(k)) & 1n) << varBits[k];
                 }
                 addresses.push(version === 4 ? bigIntToIPv4(addr) : bigIntToIPv6(addr));
-                
-                // --- 性能优化：定期让出主线程 ---
-                if (addresses.length % 10000 === 0) {
-                     // 使用 await 可以让浏览器处理其他任务，但会显著减慢生成速度
-                     // 更好的方式是在循环外部使用 setTimeout，但这会打断逻辑流
-                     // 这里采用一个折中方案：对于大数量，给出提示并允许用户取消
-                     if (addresses.length > 100000) {
-                         console.warn(`已生成 ${addresses.length} 个地址...`);
-                     }
-                }
-                // --- 优化结束 ---
             }
             return addresses;
         }
@@ -607,37 +599,21 @@
                     const endTime = performance.now();
                     const duration = (endTime - startTime).toFixed(2);
 
-                    // --- 性能优化：分批渲染结果 ---
-                    const batchSize = 10000;
-                    let index = 0;
-                    outputArea.value = '';
+                    // --- 性能优化：一次性整体赋值，避免 += 反复重建大字符串 ---
+                    outputArea.value = allAddresses.join('\n');
                     outputArea.classList.remove('processing');
 
-                    function appendBatch() {
-                        const batchEnd = Math.min(index + batchSize, allAddresses.length);
-                        const batchText = allAddresses.slice(index, batchEnd).join('\n') + (batchEnd < allAddresses.length ? '\n' : '');
-                        outputArea.value += batchText;
-                        index = batchEnd;
+                    // 全部完成
+                    totalGeneratedElement.textContent = allAddresses.length.toLocaleString();
+                    generationTimeElement.textContent = `${duration}ms`;
+                    statsContainer.style.display = 'block';
 
-                        if (index < allAddresses.length) {
-                            // 继续下一批
-                            setTimeout(appendBatch, 0);
-                        } else {
-                            // 全部完成
-                            totalGeneratedElement.textContent = allAddresses.length.toLocaleString();
-                            generationTimeElement.textContent = `${duration}ms`;
-                            statsContainer.style.display = 'block';
-
-                            if (allAddresses.length > 50000) {
-                                warningMessage.textContent = `生成了 ${allAddresses.length.toLocaleString()} 个地址。复制或下载可能需要较长时间。`;
-                                warningMessage.style.display = 'block';
-                            }
-
-                            showNotification(`成功生成 ${allAddresses.length.toLocaleString()} 个 IP 地址！耗时 ${duration}ms`);
-                        }
+                    if (allAddresses.length > 50000) {
+                        warningMessage.textContent = `生成了 ${allAddresses.length.toLocaleString()} 个地址。复制或下载可能需要较长时间。`;
+                        warningMessage.style.display = 'block';
                     }
 
-                    appendBatch(); // 开始追加
+                    showNotification(`成功生成 ${allAddresses.length.toLocaleString()} 个 IP 地址！耗时 ${duration}ms`);
                     // --- 优化结束 ---
 
                 } catch (error) {
